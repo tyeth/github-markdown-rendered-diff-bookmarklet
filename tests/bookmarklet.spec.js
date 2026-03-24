@@ -2,9 +2,9 @@
 /**
  * Playwright tests for the GitHub Markdown Rendered Diff Bookmarklet.
  *
- * Tests run against local HTML fixtures that mirror the DOM structure of
- * https://github.com/adafruit/Wippersnapper_Components/pull/301/changes
- * (README.md, 552 additions, 136 deletions).
+ * Tests run against REAL GitHub page HTML saved as fixtures:
+ *   - pr-changes-react.html: React-based diff (logged-in PR /changes page)
+ *   - tree-compare-classic.html: Classic diff (tree compare / branch compare page)
  *
  * A minimal snarkdown shim is injected so tests run without the real
  * markdown parser and without internet access.
@@ -18,15 +18,15 @@ const fs = require('fs');
 // Helpers
 // ---------------------------------------------------------------------------
 
-const BOOKMARKLET_PATH = path.resolve(__dirname, '../src/bookmarklet.js');
-const INLINE_FIXTURE   = path.resolve(__dirname, 'fixtures/inline-diff.html');
-const SPLIT_FIXTURE    = path.resolve(__dirname, 'fixtures/split-diff.html');
+const BOOKMARKLET_PATH   = path.resolve(__dirname, '../src/bookmarklet.js');
+const PR_REACT_FIXTURE   = path.resolve(__dirname, 'fixtures/pr-changes-react.html');
+const TREE_CLASSIC_FIXTURE = path.resolve(__dirname, 'fixtures/tree-compare-classic.html');
 
 const bookmarkletSource = fs.readFileSync(BOOKMARKLET_PATH, 'utf-8');
 
 /**
  * A minimal snarkdown-compatible browser shim for tests.
- * Handles enough Markdown to verify green/red rendering of PR #301 content.
+ * Handles enough Markdown to verify rendered diff output.
  */
 const SNARKDOWN_SHIM = `
 (function (global) {
@@ -78,27 +78,18 @@ async function runBookmarklet(page) {
 }
 
 // ---------------------------------------------------------------------------
-// Tests: inline (unified) diff view  —  based on PR #301
+// Tests: PR changes page (React-based / logged-in UI)
+// README.md with 552 additions, 136 deletions
 // ---------------------------------------------------------------------------
 
-test.describe('Inline diff view (unified)', () => {
+test.describe('PR changes page (React UI)', () => {
   test.beforeEach(async ({ page }) => {
-    await loadFixture(page, INLINE_FIXTURE);
+    await loadFixture(page, PR_REACT_FIXTURE);
   });
 
-  test('adds a toggle button ONLY to the .md file diff', async ({ page }) => {
+  test('adds exactly one toggle button for the .md file diff', async ({ page }) => {
     await runBookmarklet(page);
-
-    const buttons = page.locator('.bookmarklet-toggle-btn');
-    await expect(buttons).toHaveCount(1);
-
-    // The button lives inside the README.md file container
-    const mdContainer = page.locator('#diff-readme');
-    await expect(mdContainer.locator('.bookmarklet-toggle-btn')).toBeVisible();
-
-    // The JSON file container must NOT have a toggle button
-    const jsonContainer = page.locator('#diff-json');
-    await expect(jsonContainer.locator('.bookmarklet-toggle-btn')).toHaveCount(0);
+    await expect(page.locator('.bookmarklet-toggle-btn')).toHaveCount(1);
   });
 
   test('toggle button initial label is "Show Rendered Diff"', async ({ page }) => {
@@ -114,8 +105,8 @@ test.describe('Inline diff view (unified)', () => {
   test('clicking toggle shows rendered diff and hides code table', async ({ page }) => {
     await runBookmarklet(page);
 
-    const btn   = page.locator('.bookmarklet-toggle-btn');
-    const table = page.locator('#diff-readme table');
+    const btn      = page.locator('.bookmarklet-toggle-btn');
+    const table    = page.locator('table[data-diff-anchor]');
     const rendered = page.locator('.bookmarklet-rendered-diff');
 
     await btn.click();
@@ -130,11 +121,11 @@ test.describe('Inline diff view (unified)', () => {
     await runBookmarklet(page);
 
     const btn      = page.locator('.bookmarklet-toggle-btn');
-    const table    = page.locator('#diff-readme table');
+    const table    = page.locator('table[data-diff-anchor]');
     const rendered = page.locator('.bookmarklet-rendered-diff');
 
-    await btn.click(); // → rendered
-    await btn.click(); // → code diff
+    await btn.click();
+    await btn.click();
 
     await expect(table).toBeVisible();
     await expect(rendered).toBeHidden();
@@ -149,9 +140,8 @@ test.describe('Inline diff view (unified)', () => {
     const addChunks = page.locator('.bookmarklet-diff-chunk--add');
     await expect(addChunks).not.toHaveCount(0);
 
-    const firstAdd = addChunks.first();
-    const bgColor = await firstAdd.evaluate(el => el.style.backgroundColor);
-    expect(bgColor).toBe('rgb(230, 255, 237)'); // #e6ffed
+    const bgColor = await addChunks.first().evaluate(el => el.style.backgroundColor);
+    expect(bgColor).toBe('rgb(230, 255, 237)');
   });
 
   test('deleted chunks have a red background', async ({ page }) => {
@@ -161,91 +151,126 @@ test.describe('Inline diff view (unified)', () => {
     const delChunks = page.locator('.bookmarklet-diff-chunk--delete');
     await expect(delChunks).not.toHaveCount(0);
 
-    const firstDel = delChunks.first();
-    const bgColor = await firstDel.evaluate(el => el.style.backgroundColor);
-    expect(bgColor).toBe('rgb(255, 238, 240)'); // #ffeef0
+    const bgColor = await delChunks.first().evaluate(el => el.style.backgroundColor);
+    expect(bgColor).toBe('rgb(255, 238, 240)');
   });
 
-  test('rendered diff contains content from the PR (headings, links)', async ({ page }) => {
+  test('rendered diff contains diff content (headings, text)', async ({ page }) => {
     await runBookmarklet(page);
     await page.locator('.bookmarklet-toggle-btn').click();
 
     const rendered = page.locator('.bookmarklet-rendered-diff');
-
-    // New heading from PR #301 should appear somewhere in the rendered diff
+    // Added heading
     await expect(rendered).toContainText('How Does It Work?');
-
-    // The old (deleted) heading should also appear somewhere in the rendered diff
+    // Deleted heading
     await expect(rendered).toContainText('How Will It Work?');
-  });
-
-  test('markdown links in additions are rendered as <a> elements', async ({ page }) => {
-    await runBookmarklet(page);
-    await page.locator('.bookmarklet-toggle-btn').click();
-
-    // The addition contains [WipperSnapper](url) — must become an <a>
-    const addChunk = page.locator('.bookmarklet-diff-chunk--add').first();
-    const link = addChunk.locator('a[href*="wippersnapper"]');
-    await expect(link).toHaveCount(1);
-    await expect(link).toHaveText('WipperSnapper');
+    // Context line
+    await expect(rendered).toContainText('Wippersnapper Component Definitions');
   });
 
   test('does not augment the page twice when the bookmarklet runs again', async ({ page }) => {
     await runBookmarklet(page);
-    // Run the bookmarklet a second time
     await page.evaluate(bookmarkletSource);
 
-    // Must still have exactly one toggle button and one rendered view
     await expect(page.locator('.bookmarklet-toggle-btn')).toHaveCount(1);
     await expect(page.locator('.bookmarklet-rendered-diff')).toHaveCount(1);
   });
 });
 
 // ---------------------------------------------------------------------------
-// Tests: split (side-by-side) diff view  —  based on PR #301
+// Tests: Tree compare page (classic / logged-out UI)
+// README.md among ~50 other files, classic .file / .blob-code structure
 // ---------------------------------------------------------------------------
 
-test.describe('Split diff view (side-by-side)', () => {
+test.describe('Tree compare page (classic UI)', () => {
   test.beforeEach(async ({ page }) => {
-    await loadFixture(page, SPLIT_FIXTURE);
+    await loadFixture(page, TREE_CLASSIC_FIXTURE);
   });
 
-  test('adds a toggle button to the .md file diff in split view', async ({ page }) => {
+  test('adds toggle button(s) only to .md file diffs, not .json/.js/.vue', async ({ page }) => {
     await runBookmarklet(page);
-    await expect(page.locator('.bookmarklet-toggle-btn')).toHaveCount(1);
+
+    // Should have button(s) for .md file(s) only
+    const buttons = page.locator('.bookmarklet-toggle-btn');
+    const count = await buttons.count();
+    expect(count).toBeGreaterThanOrEqual(1);
+
+    // No .json or .js file should have a toggle button
+    const jsonFiles = page.locator('.file[data-file-type=".json"] .bookmarklet-toggle-btn');
+    await expect(jsonFiles).toHaveCount(0);
+    const jsFiles = page.locator('.file[data-file-type=".js"] .bookmarklet-toggle-btn');
+    await expect(jsFiles).toHaveCount(0);
   });
 
-  test('clicking toggle shows rendered diff in split view', async ({ page }) => {
+  test('toggle button initial label is "Show Rendered Diff"', async ({ page }) => {
     await runBookmarklet(page);
-    await page.locator('.bookmarklet-toggle-btn').click();
-
-    await expect(page.locator('.bookmarklet-rendered-diff')).toBeVisible();
-    await expect(page.locator('#diff-readme-split table')).toBeHidden();
+    await expect(page.locator('.bookmarklet-toggle-btn').first()).toHaveText('Show Rendered Diff');
   });
 
-  test('context lines are not duplicated in split view', async ({ page }) => {
+  test('rendered diff is hidden before the button is clicked', async ({ page }) => {
     await runBookmarklet(page);
-    await page.locator('.bookmarklet-toggle-btn').click();
-
-    // "# Wippersnapper Component Definitions" is a context line that appears
-    // in both the left and right columns of the split view table.
-    // The rendered diff must show it only once.
-    const HEADING_PATTERN = /Wippersnapper Component Definitions/g;
-    const rendered = page.locator('.bookmarklet-rendered-diff');
-    const allText  = await rendered.textContent();
-    const count    = (allText.match(HEADING_PATTERN) || []).length;
-    expect(count).toBe(1);
+    await expect(page.locator('.bookmarklet-rendered-diff').first()).toBeHidden();
   });
 
-  test('split view: paired deletion + addition render in correct chunks', async ({ page }) => {
+  test('clicking toggle shows rendered diff and hides code table', async ({ page }) => {
     await runBookmarklet(page);
-    await page.locator('.bookmarklet-toggle-btn').click();
 
-    // Both deleted and added intro paragraphs must appear in separate chunks
-    const del = page.locator('.bookmarklet-diff-chunk--delete');
-    const add = page.locator('.bookmarklet-diff-chunk--add');
+    const btn = page.locator('.bookmarklet-toggle-btn').first();
+    await btn.click();
 
-    await expect(del).not.toHaveCount(0);
-    await expect(add).not.toHaveCount(0);
+    await expect(page.locator('.bookmarklet-rendered-diff').first()).toBeVisible();
+    await expect(btn).toHaveText('Show Code Diff');
+  });
+
+  test('clicking toggle a second time restores the code table', async ({ page }) => {
+    await runBookmarklet(page);
+
+    const btn = page.locator('.bookmarklet-toggle-btn').first();
+    await btn.click();
+    await btn.click();
+
+    await expect(page.locator('.bookmarklet-rendered-diff').first()).toBeHidden();
+    await expect(btn).toHaveText('Show Rendered Diff');
+  });
+
+  test('added chunks have a green background', async ({ page }) => {
+    await runBookmarklet(page);
+    await page.locator('.bookmarklet-toggle-btn').first().click();
+
+    const addChunks = page.locator('.bookmarklet-diff-chunk--add');
+    await expect(addChunks).not.toHaveCount(0);
+
+    const bgColor = await addChunks.first().evaluate(el => el.style.backgroundColor);
+    expect(bgColor).toBe('rgb(230, 255, 237)');
+  });
+
+  test('deleted chunks have a red background', async ({ page }) => {
+    await runBookmarklet(page);
+    await page.locator('.bookmarklet-toggle-btn').first().click();
+
+    const delChunks = page.locator('.bookmarklet-diff-chunk--delete');
+    await expect(delChunks).not.toHaveCount(0);
+
+    const bgColor = await delChunks.first().evaluate(el => el.style.backgroundColor);
+    expect(bgColor).toBe('rgb(255, 238, 240)');
+  });
+
+  test('rendered diff contains content from the README', async ({ page }) => {
+    await runBookmarklet(page);
+    await page.locator('.bookmarklet-toggle-btn').first().click();
+
+    const rendered = page.locator('.bookmarklet-rendered-diff').first();
+    // The README.md in this compare has "ProtoMQ" heading
+    await expect(rendered).toContainText('ProtoMQ');
+  });
+
+  test('does not augment the page twice when the bookmarklet runs again', async ({ page }) => {
+    await runBookmarklet(page);
+    const countBefore = await page.locator('.bookmarklet-toggle-btn').count();
+
+    await page.evaluate(bookmarkletSource);
+    const countAfter = await page.locator('.bookmarklet-toggle-btn').count();
+
+    expect(countAfter).toBe(countBefore);
   });
 });

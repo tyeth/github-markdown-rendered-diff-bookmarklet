@@ -7,6 +7,9 @@
  * A toggle button on each markdown diff file lets you switch between the
  * original code diff and the rendered diff.
  *
+ * Supports both the classic (logged-out) GitHub UI and the newer
+ * React-based (logged-in) diff viewer.
+ *
  * Usage: paste the contents of this file (wrapped in `javascript:(function(){...})();`)
  * into a browser bookmark's URL field.
  */
@@ -28,56 +31,93 @@
   }
 
   /* ------------------------------------------------------------------ */
+  /* UI mode detection                                                    */
+  /* ------------------------------------------------------------------ */
+
+  /**
+   * Detects whether a container uses the new React-based diff UI.
+   * In the new UI, containers have `data-diff-anchor` and tables use
+   * `aria-label` instead of `.file-header` / `[title$=".md"]`.
+   *
+   * @param {Element} container
+   * @returns {boolean}
+   */
+  function isReactUI(container) {
+    return !container.classList.contains('file');
+  }
+
+  /* ------------------------------------------------------------------ */
   /* Diff table parsing                                                   */
   /* ------------------------------------------------------------------ */
 
   /**
-   * Returns the semantic type of a single `.blob-code` cell.
+   * Returns the semantic type of a single diff cell.
+   * Handles both old UI (`.blob-code-addition` etc. on the `<td>`)
+   * and new UI (`addition`/`deletion` on the inner `<code>` element).
+   *
    * @param {Element} cell
    * @returns {'add'|'delete'|'context'|null}
    */
   function getCellType(cell) {
+    // Old UI: classes on the <td> itself
     if (cell.classList.contains('blob-code-addition')) return 'add';
     if (cell.classList.contains('blob-code-deletion')) return 'delete';
     if (cell.classList.contains('blob-code-context')) return 'context';
+
+    // New React UI: type is on the <code> child element
+    var code = cell.querySelector('code');
+    if (code) {
+      if (code.classList.contains('addition')) return 'add';
+      if (code.classList.contains('deletion')) return 'delete';
+      // A code element without addition/deletion is a context line
+      if (code.classList.contains('diff-text')) return 'context';
+    }
+
     return null;
   }
 
   /**
-   * Extracts the raw markdown text from a `.blob-code` cell.
+   * Extracts the raw markdown text from a diff cell.
    *
-   * Modern GitHub sets `data-code-marker` on `.blob-code-inner` and the text
-   * content is already the bare code without the +/- prefix.
-   * Older GitHub embeds the +/- prefix in the text content directly.
+   * Old UI: `.blob-code-inner` with optional `data-code-marker`.
+   * New UI: `.diff-text-inner` div inside the `<code>` element.
    *
    * @param {Element} cell
    * @returns {string}
    */
   function getCellContent(cell) {
+    // Old UI
     var inner = cell.querySelector('.blob-code-inner');
-    if (!inner) return '';
+    if (inner) {
+      var text = inner.textContent;
 
-    var text = inner.textContent;
+      // Modern GitHub: data-code-marker is present, text is already clean
+      if (inner.hasAttribute('data-code-marker')) {
+        return text;
+      }
 
-    // Modern GitHub: data-code-marker is present, text is already clean
-    if (inner.hasAttribute('data-code-marker')) {
+      // Older GitHub: strip leading +/- /space marker if present
+      if (text.length > 0 && (text[0] === '+' || text[0] === '-' || text[0] === ' ')) {
+        return text.slice(1);
+      }
+
       return text;
     }
 
-    // Older GitHub: strip leading +/- /space marker if present
-    if (text.length > 0 && (text[0] === '+' || text[0] === '-' || text[0] === ' ')) {
-      return text.slice(1);
+    // New React UI
+    var diffInner = cell.querySelector('.diff-text-inner');
+    if (diffInner) {
+      return diffInner.textContent;
     }
 
-    return text;
+    return '';
   }
 
   /**
    * Parses a diff `<table>` and returns an ordered array of line objects.
    *
-   * Handles both inline (unified) and split (side-by-side) diff views.
-   * In split view, context lines appear twice (once per side); only the
-   * first occurrence is emitted to avoid duplication.
+   * Handles both inline (unified) and split (side-by-side) diff views,
+   * and both old and new GitHub UI structures.
    *
    * @param {HTMLTableElement} table
    * @returns {Array<{type: 'add'|'delete'|'context', content: string}>}
@@ -87,9 +127,13 @@
 
     var rows = table.querySelectorAll('tbody tr');
     rows.forEach(function (row) {
+      // Try old UI selector first, fall back to new UI selector
       var codeCells = Array.prototype.slice.call(row.querySelectorAll('.blob-code'));
+      if (codeCells.length === 0) {
+        codeCells = Array.prototype.slice.call(row.querySelectorAll('.diff-text-cell'));
+      }
 
-      // Skip hunk-header rows (@@ … @@)
+      // Skip hunk-header rows (@@ ... @@)
       if (codeCells.length === 0) return;
       if (row.classList.contains('js-expandable-line')) return;
 
@@ -99,7 +143,7 @@
         var type = getCellType(cell);
         if (!type) return;
 
-        // In split view, both halves of an unchanged line are context —
+        // In split view, both halves of an unchanged line are context --
         // emit only the first to avoid duplicating context content.
         if (type === 'context') {
           if (contextSeenInRow) return;
@@ -245,30 +289,114 @@
   /* ------------------------------------------------------------------ */
 
   /**
+   * Checks whether a container represents a .md file diff.
+   *
+   * Old UI: looks for `[title$=".md"]` or text content of file-info links.
+   * New UI: checks the table's `aria-label` attribute for `.md` extension.
+   *
+   * @param {Element} container
+   * @param {boolean} reactUI
+   * @returns {boolean}
+   */
+  function isMarkdownFile(container, reactUI) {
+    if (reactUI) {
+      // New React UI: check the table's aria-label
+      var table = container.querySelector('table[aria-label]');
+      if (table) {
+        var label = table.getAttribute('aria-label') || '';
+        return /\.md$/i.test(label);
+      }
+      return false;
+    }
+
+    // Old UI
+    var titleEl = container.querySelector('[title$=".md"]');
+    if (titleEl) return true;
+
+    var linkEl = container.querySelector('.file-info a, .file-header a');
+    if (!linkEl) return false;
+    var name = (linkEl.getAttribute('title') || linkEl.textContent || '').trim();
+    return name.toLowerCase().endsWith('.md');
+  }
+
+  /**
+   * Attaches the toggle button to the appropriate location.
+   *
+   * Old UI: `.file-actions` or `.file-header`.
+   * New UI: `[class*="DiffFileHeader"]` or insert before the table's parent.
+   *
+   * @param {Element} container
+   * @param {HTMLButtonElement} btn
+   * @param {boolean} reactUI
+   */
+  function attachButton(container, btn, reactUI) {
+    if (reactUI) {
+      var header = container.querySelector('[class*="DiffFileHeader"]');
+      if (header) {
+        header.appendChild(btn);
+        return;
+      }
+      // Fallback: insert at the top of the container
+      container.insertBefore(btn, container.firstChild);
+      return;
+    }
+
+    // Old UI
+    var actionBar =
+      container.querySelector('.file-actions') ||
+      container.querySelector('.file-header');
+    if (actionBar) {
+      actionBar.appendChild(btn);
+    }
+  }
+
+  /**
    * Finds all markdown file diffs on the page and augments each with a
-   * rendered-markdown toggle button.
+   * rendered-markdown toggle button. Supports both old and new GitHub UI.
    */
   function augmentPage() {
+    // Try old UI first, then fall back to new React UI
     var fileContainers = document.querySelectorAll('.file');
+    var reactUI = false;
+
+    if (fileContainers.length === 0) {
+      // New React UI (PR changes / compare pages): the wrapper div has a
+      // class containing "Diff-module__diff__" and contains the diff table.
+      // Fall back to any element whose table child has data-diff-anchor
+      // (in case class names change).
+      fileContainers = document.querySelectorAll('[class*="Diff-module__diff__"]');
+      if (fileContainers.length === 0) {
+        // Broader fallback: find tables with data-diff-anchor and use their parent containers
+        var tables = document.querySelectorAll('table[data-diff-anchor]');
+        if (tables.length > 0) {
+          var containers = [];
+          tables.forEach(function (t) { containers.push(t.parentElement.parentElement || t.parentElement); });
+          fileContainers = containers;
+        }
+      }
+      reactUI = true;
+    }
+
+    if (fileContainers.length === 0) {
+      console.warn('[MD Diff] No .file containers found. GitHub may be using a different UI.');
+      console.warn('[MD Diff] Debug: body classes = ' + document.body.className);
+      return;
+    }
+
     var augmented = 0;
 
     Array.prototype.forEach.call(fileContainers, function (container) {
       // Skip already-augmented containers
       if (container.dataset.mdDiffAugmented) return;
 
-      // Determine whether this diff is for a .md file.
-      // GitHub sets `title` on the link/element containing the filename.
-      var titleEl = container.querySelector('[title$=".md"]');
-      if (!titleEl) {
-        // Fallback: look at text content of the file-info link
-        var linkEl = container.querySelector('.file-info a, .file-header a');
-        if (!linkEl) return;
-        var name = (linkEl.getAttribute('title') || linkEl.textContent || '').trim();
-        if (!name.toLowerCase().endsWith('.md')) return;
-      }
+      // Determine whether this diff is for a .md file
+      if (!isMarkdownFile(container, reactUI)) return;
 
       var table = container.querySelector('table');
-      if (!table) return;
+      if (!table) {
+        console.warn('[MD Diff] .md file found but no diff table yet — content may still be loading. Try running the bookmarklet again.');
+        return;
+      }
 
       var lines = parseDiffTable(table);
       if (!lines.length) return;
@@ -302,13 +430,8 @@
         }
       });
 
-      // Attach button to file-actions bar or the file header
-      var actionBar =
-        container.querySelector('.file-actions') ||
-        container.querySelector('.file-header');
-      if (actionBar) {
-        actionBar.appendChild(btn);
-      }
+      // Attach button to the appropriate location
+      attachButton(container, btn, reactUI);
 
       augmented++;
     });
