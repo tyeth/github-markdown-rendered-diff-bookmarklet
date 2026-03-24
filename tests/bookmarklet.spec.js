@@ -140,8 +140,9 @@ test.describe('PR changes page (React UI)', () => {
     const addChunks = page.locator('.bookmarklet-diff-chunk--add');
     await expect(addChunks).not.toHaveCount(0);
 
-    const bgColor = await addChunks.first().evaluate(el => el.style.backgroundColor);
-    expect(bgColor).toBe('rgb(230, 255, 237)');
+    // Green-tinted background (light: #e6ffec, dark: rgba green)
+    const bg = await addChunks.first().evaluate(el => el.style.backgroundColor);
+    expect(bg).toMatch(/230, 255, 236|46,\s*160,\s*67/);
   });
 
   test('deleted chunks have a red background', async ({ page }) => {
@@ -151,8 +152,9 @@ test.describe('PR changes page (React UI)', () => {
     const delChunks = page.locator('.bookmarklet-diff-chunk--delete');
     await expect(delChunks).not.toHaveCount(0);
 
-    const bgColor = await delChunks.first().evaluate(el => el.style.backgroundColor);
-    expect(bgColor).toBe('rgb(255, 238, 240)');
+    // Red-tinted background (light: #ffebe9, dark: rgba red)
+    const bg = await delChunks.first().evaluate(el => el.style.backgroundColor);
+    expect(bg).toMatch(/255, 235, 233|248,\s*81,\s*73/);
   });
 
   test('rendered diff contains diff content (headings, text)', async ({ page }) => {
@@ -240,8 +242,9 @@ test.describe('Tree compare page (classic UI)', () => {
     const addChunks = page.locator('.bookmarklet-diff-chunk--add');
     await expect(addChunks).not.toHaveCount(0);
 
-    const bgColor = await addChunks.first().evaluate(el => el.style.backgroundColor);
-    expect(bgColor).toBe('rgb(230, 255, 237)');
+    // Green-tinted background (light: #e6ffec, dark: rgba green)
+    const bg = await addChunks.first().evaluate(el => el.style.backgroundColor);
+    expect(bg).toMatch(/230, 255, 236|46,\s*160,\s*67/);
   });
 
   test('deleted chunks have a red background', async ({ page }) => {
@@ -251,8 +254,9 @@ test.describe('Tree compare page (classic UI)', () => {
     const delChunks = page.locator('.bookmarklet-diff-chunk--delete');
     await expect(delChunks).not.toHaveCount(0);
 
-    const bgColor = await delChunks.first().evaluate(el => el.style.backgroundColor);
-    expect(bgColor).toBe('rgb(255, 238, 240)');
+    // Red-tinted background (light: #ffebe9, dark: rgba red)
+    const bg = await delChunks.first().evaluate(el => el.style.backgroundColor);
+    expect(bg).toMatch(/255, 235, 233|248,\s*81,\s*73/);
   });
 
   test('rendered diff contains content from the README', async ({ page }) => {

@@ -17,6 +17,110 @@
   'use strict';
 
   /* ------------------------------------------------------------------ */
+  /* Theme detection                                                      */
+  /* ------------------------------------------------------------------ */
+
+  /**
+   * Detects whether the page is in dark mode by inspecting GitHub's
+   * `data-color-mode` / `data-dark-theme` attributes on <html>, or
+   * falling back to the `prefers-color-scheme` media query.
+   *
+   * @returns {boolean}
+   */
+  function isDarkMode() {
+    var root = document.documentElement;
+    var mode = root.getAttribute('data-color-mode');
+    if (mode === 'dark') return true;
+    if (mode === 'light') return false;
+    // "auto" — follow system preference
+    return window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches;
+  }
+
+  /**
+   * Returns a palette of colours appropriate for the current theme.
+   */
+  function getThemeColors() {
+    if (isDarkMode()) {
+      return {
+        wrapperBg:      '#0d1117',
+        wrapperBorder:  '#30363d',
+        addBg:          'rgba(46,160,67,0.15)',
+        addBorder:      '#238636',
+        addWordBg:      'rgba(46,160,67,0.40)',
+        delBg:          'rgba(248,81,73,0.15)',
+        delBorder:      '#da3633',
+        delWordBg:      'rgba(248,81,73,0.40)',
+        fg:             '#e6edf3'
+      };
+    }
+    return {
+      wrapperBg:      '#ffffff',
+      wrapperBorder:  '#d0d7de',
+      addBg:          '#e6ffec',
+      addBorder:      '#22863a',
+      addWordBg:      '#abf2bc',
+      delBg:          '#ffebe9',
+      delBorder:      '#cb2431',
+      delWordBg:      '#ff8182',
+      fg:             '#1f2328'
+    };
+  }
+
+  /* ------------------------------------------------------------------ */
+  /* Word-level diff highlighting                                         */
+  /* ------------------------------------------------------------------ */
+
+  /**
+   * Given two strings, returns an array of segments:
+   *   { text, changed: boolean }
+   * Uses a simple word-boundary split + LCS approach.
+   */
+  function diffWords(oldStr, newStr) {
+    var oldWords = oldStr.split(/(\s+)/);
+    var newWords = newStr.split(/(\s+)/);
+
+    // Build LCS table
+    var m = oldWords.length, n = newWords.length;
+    // For very long diffs, skip word-level highlighting (perf guard)
+    if (m * n > 50000) return null;
+
+    var dp = [];
+    var i, j;
+    for (i = 0; i <= m; i++) {
+      dp[i] = [];
+      for (j = 0; j <= n; j++) {
+        if (i === 0 || j === 0) { dp[i][j] = 0; }
+        else if (oldWords[i - 1] === newWords[j - 1]) { dp[i][j] = dp[i - 1][j - 1] + 1; }
+        else { dp[i][j] = Math.max(dp[i - 1][j], dp[i][j - 1]); }
+      }
+    }
+
+    // Backtrack to find which words are common
+    var newChanged = [];
+    for (j = 0; j < n; j++) newChanged[j] = true;
+    i = m; j = n;
+    while (i > 0 && j > 0) {
+      if (oldWords[i - 1] === newWords[j - 1]) {
+        newChanged[j - 1] = false;
+        i--; j--;
+      } else if (dp[i - 1][j] > dp[i][j - 1]) { i--; }
+      else { j--; }
+    }
+
+    // Merge consecutive same-state segments
+    var result = [];
+    for (j = 0; j < n; j++) {
+      var last = result.length > 0 ? result[result.length - 1] : null;
+      if (last && last.changed === newChanged[j]) {
+        last.text += newWords[j];
+      } else {
+        result.push({ text: newWords[j], changed: newChanged[j] });
+      }
+    }
+    return result;
+  }
+
+  /* ------------------------------------------------------------------ */
   /* Bootstrap                                                            */
   /* ------------------------------------------------------------------ */
 
@@ -192,31 +296,66 @@
   }
 
   /**
+   * Applies word-level highlighting to a chunk's HTML.
+   * When a delete chunk is immediately followed by an add chunk, we diff
+   * the raw text word-by-word and wrap changed segments with <mark>.
+   *
+   * @param {string} markdown  The raw markdown text for this chunk
+   * @param {string|null} pairMarkdown  The paired chunk's text (del for add, add for del)
+   * @param {string} wordBg  Background colour for the <mark> highlights
+   * @returns {string}  HTML string
+   */
+  function renderMarkdownWithHighlights(markdown, pairMarkdown, wordBg) {
+    var parse = window.snarkdown || snarkdown;
+    if (!pairMarkdown) return parse(markdown);
+
+    var segments = diffWords(pairMarkdown, markdown);
+    if (!segments) return parse(markdown);
+
+    // Build highlighted plain text, then parse
+    var highlighted = segments.map(function (seg) {
+      if (seg.changed && seg.text.trim()) {
+        return '⟪HLSTART⟫' + seg.text + '⟪HLEND⟫';
+      }
+      return seg.text;
+    }).join('');
+
+    var html = parse(highlighted);
+    // Replace markers with <mark> tags (markers survive markdown parsing)
+    html = html.replace(/⟪HLSTART⟫/g, '<mark style="background:' + wordBg + ';border-radius:3px;padding:0 1px">')
+               .replace(/⟪HLEND⟫/g, '</mark>');
+    return html;
+  }
+
+  /**
    * Renders a single chunk (group of same-type lines) as an HTML element.
    *
    * @param {{type: string, lines: string[]}} chunk
+   * @param {{type: string, lines: string[]}|null} pairChunk  Adjacent paired chunk for word-diff
+   * @param {object} colors  Theme colour palette
    * @returns {HTMLElement}
    */
-  function renderChunk(chunk) {
+  function renderChunk(chunk, pairChunk, colors) {
     var markdown = chunk.lines.join('\n');
-    var parse = window.snarkdown || snarkdown;
-    var html = parse(markdown);
+    var pairMarkdown = pairChunk ? pairChunk.lines.join('\n') : null;
 
     var div = document.createElement('div');
     div.className = 'bookmarklet-diff-chunk bookmarklet-diff-chunk--' + chunk.type;
-    div.innerHTML = html;
 
     if (chunk.type === 'add') {
-      div.style.backgroundColor = '#e6ffed';
-      div.style.borderLeft = '4px solid #22863a';
+      div.innerHTML = renderMarkdownWithHighlights(markdown, pairMarkdown, colors.addWordBg);
+      div.style.backgroundColor = colors.addBg;
+      div.style.borderLeft = '4px solid ' + colors.addBorder;
       div.style.paddingLeft = '8px';
       div.style.margin = '2px 0';
     } else if (chunk.type === 'delete') {
-      div.style.backgroundColor = '#ffeef0';
-      div.style.borderLeft = '4px solid #cb2431';
+      div.innerHTML = renderMarkdownWithHighlights(markdown, pairMarkdown, colors.delWordBg);
+      div.style.backgroundColor = colors.delBg;
+      div.style.borderLeft = '4px solid ' + colors.delBorder;
       div.style.paddingLeft = '8px';
       div.style.margin = '2px 0';
     } else {
+      div.innerHTML = (window.snarkdown || snarkdown)(markdown);
       div.style.paddingLeft = '12px';
       div.style.margin = '2px 0';
     }
@@ -232,6 +371,7 @@
    */
   function createRenderedDiffView(lines) {
     var chunks = buildChunks(lines);
+    var colors = getThemeColors();
 
     var wrapper = document.createElement('div');
     wrapper.className = 'bookmarklet-rendered-diff';
@@ -239,15 +379,28 @@
       '-apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, Arial, sans-serif';
     wrapper.style.fontSize = '14px';
     wrapper.style.lineHeight = '1.5';
-    wrapper.style.border = '1px solid #e1e4e8';
+    wrapper.style.border = '1px solid ' + colors.wrapperBorder;
     wrapper.style.borderRadius = '3px';
-    wrapper.style.background = '#fff';
+    wrapper.style.background = colors.wrapperBg;
+    wrapper.style.color = colors.fg;
     wrapper.style.padding = '10px 0';
     wrapper.style.overflowX = 'auto';
 
-    chunks.forEach(function (chunk) {
-      wrapper.appendChild(renderChunk(chunk));
-    });
+    // Pair adjacent delete→add chunks for word-level highlighting
+    for (var i = 0; i < chunks.length; i++) {
+      var chunk = chunks[i];
+      var pairChunk = null;
+
+      if (chunk.type === 'delete' && i + 1 < chunks.length && chunks[i + 1].type === 'add') {
+        pairChunk = chunks[i + 1]; // pair: del sees add
+        wrapper.appendChild(renderChunk(chunk, pairChunk, colors));
+        // Now render the add chunk paired with the del
+        i++;
+        wrapper.appendChild(renderChunk(chunks[i], chunk, colors));
+      } else {
+        wrapper.appendChild(renderChunk(chunk, null, colors));
+      }
+    }
 
     return wrapper;
   }
