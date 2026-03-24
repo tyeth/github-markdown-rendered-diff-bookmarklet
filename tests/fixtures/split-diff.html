@@ -1,0 +1,174 @@
+<!DOCTYPE html>
+<!--
+  Fixture: GitHub PR diff page (split/side-by-side view)
+  Based on: https://github.com/adafruit/Wippersnapper_Components/pull/301/changes
+  File changed: README.md (552 additions, 136 deletions)
+
+  This fixture mirrors the DOM structure GitHub uses for its split diff view
+  (two columns: old on the left, new on the right).
+-->
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="diff-view" content="split">
+  <title>Rewrite README · Pull Request #301 · adafruit/Wippersnapper_Components (split view)</title>
+  <style>
+    body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; margin: 0; padding: 16px; background: #f6f8fa; }
+    .file { border: 1px solid #e1e4e8; border-radius: 6px; margin-bottom: 16px; background: #fff; }
+    .file-header { display: flex; align-items: center; padding: 8px 16px; background: #f6f8fa; border-bottom: 1px solid #e1e4e8; border-radius: 6px 6px 0 0; }
+    .file-info { flex: 1; }
+    .file-actions { display: flex; align-items: center; }
+    .diff-table { width: 100%; border-collapse: collapse; font-family: "SFMono-Regular", Consolas, monospace; font-size: 12px; }
+    .blob-num { width: 1%; min-width: 40px; padding: 0 8px; color: rgba(27,31,35,.3); text-align: right; white-space: nowrap; border-right: 1px solid #eaecef; }
+    .blob-code { padding: 0 10px; white-space: pre; width: 49%; }
+    .blob-code-addition { background-color: #cdffd8; }
+    .blob-num-addition  { background-color: #cdffd8; }
+    .blob-code-deletion { background-color: #ffdce0; }
+    .blob-num-deletion  { background-color: #ffdce0; }
+    .blob-code-context  { background-color: #fff; }
+    .blob-code-hunk     { background-color: #dbedff; color: rgba(27,31,35,.7); }
+    .blob-code-inner    { display: inline-block; }
+    a.Link--primary { color: #0366d6; text-decoration: none; font-weight: 600; }
+  </style>
+</head>
+<body>
+<div id="files">
+
+  <!--
+    ============================================================
+    FILE 1: README.md  (split view — SHOULD be augmented)
+    Each row has 4 cells: [old-num | old-code | new-num | new-code]
+    ============================================================
+  -->
+  <div class="file js-details-container" id="diff-readme-split" data-details-container-group="file">
+    <div class="file-header" data-path="README.md">
+      <div class="file-info flex-auto">
+        <a class="Link--primary" href="#diff-readme-split" title="README.md">README.md</a>
+        <span style="margin-left:8px;color:#586069;font-size:12px;">+552 -136</span>
+      </div>
+      <div class="file-actions"></div>
+    </div>
+
+    <div class="js-file-content Details-content--shown">
+      <div class="data highlight js-blob-wrapper">
+        <table class="diff-table js-diff-table" data-diff-anchor="diff-readme-split" cellspacing="0" cellpadding="0">
+          <colgroup>
+            <col class="diff-line-num-col"><!-- old line num -->
+            <col class="diff-code-col"><!-- old code -->
+            <col class="diff-line-num-col"><!-- new line num -->
+            <col class="diff-code-col"><!-- new code -->
+          </colgroup>
+          <tbody>
+
+            <!-- Hunk header -->
+            <tr class="js-expandable-line js-skip-tagsearch">
+              <td colspan="4" class="blob-num blob-num-expandable">
+                <span class="blob-code-inner blob-code-hunk">@@ -1,13 +1,12 @@</span>
+              </td>
+            </tr>
+
+            <!--
+              Context line: both columns show the same unchanged text.
+              The bookmarklet must emit only ONE context entry, not two.
+            -->
+            <tr>
+              <td class="blob-num blob-num-context js-linkable-line-number" data-line-number="1"></td>
+              <td class="blob-code blob-code-context js-file-line">
+                <span class="blob-code-inner blob-code-marker" data-code-marker=" "># Wippersnapper Component Definitions</span>
+              </td>
+              <td class="blob-num blob-num-context js-linkable-line-number" data-line-number="1"></td>
+              <td class="blob-code blob-code-context js-file-line">
+                <span class="blob-code-inner blob-code-marker" data-code-marker=" "># Wippersnapper Component Definitions</span>
+              </td>
+            </tr>
+
+            <!-- Context: blank line -->
+            <tr>
+              <td class="blob-num blob-num-context js-linkable-line-number" data-line-number="2"></td>
+              <td class="blob-code blob-code-context js-file-line">
+                <span class="blob-code-inner blob-code-marker" data-code-marker=" "></span>
+              </td>
+              <td class="blob-num blob-num-context js-linkable-line-number" data-line-number="2"></td>
+              <td class="blob-code blob-code-context js-file-line">
+                <span class="blob-code-inner blob-code-marker" data-code-marker=" "></span>
+              </td>
+            </tr>
+
+            <!--
+              Changed line (paired deletion + addition in the same row).
+              Left  = old text (deletion), Right = new text (addition).
+            -->
+            <tr>
+              <td class="blob-num blob-num-deletion js-linkable-line-number" data-line-number="3"></td>
+              <td class="blob-code blob-code-deletion js-file-line">
+                <span class="blob-code-inner blob-code-marker" data-code-marker="-">Welcome! This repository contains JSON definition files and images that allow components and sensors to be used with WipperSnapper, Adafruit IO&#39;s no-code IoT service.</span>
+              </td>
+              <td class="blob-num blob-num-addition js-linkable-line-number" data-line-number="3"></td>
+              <td class="blob-code blob-code-addition js-file-line">
+                <span class="blob-code-inner blob-code-marker" data-code-marker="+">Welcome! This repository contains JSON definition files and images that allow components and sensors to be used with [WipperSnapper](https://io.adafruit.com/wippersnapper), Adafruit IO&#39;s no-code IoT service.</span>
+              </td>
+            </tr>
+
+            <!-- Context: link line -->
+            <tr>
+              <td class="blob-num blob-num-context js-linkable-line-number" data-line-number="4"></td>
+              <td class="blob-code blob-code-context js-file-line">
+                <span class="blob-code-inner blob-code-marker" data-code-marker=" ">[Click here to submit suggestions](https://github.com/adafruit/WipperSnapper_Components/issues/new/choose)</span>
+              </td>
+              <td class="blob-num blob-num-context js-linkable-line-number" data-line-number="4"></td>
+              <td class="blob-code blob-code-context js-file-line">
+                <span class="blob-code-inner blob-code-marker" data-code-marker=" ">[Click here to submit suggestions](https://github.com/adafruit/WipperSnapper_Components/issues/new/choose)</span>
+              </td>
+            </tr>
+
+            <!--
+              Old heading deleted, no corresponding addition on right.
+              Left = deletion, Right = empty addition cell (padding).
+            -->
+            <tr>
+              <td class="blob-num blob-num-deletion js-linkable-line-number" data-line-number="8"></td>
+              <td class="blob-code blob-code-deletion js-file-line">
+                <span class="blob-code-inner blob-code-marker" data-code-marker="-">## How Will It Work?</span>
+              </td>
+              <td class="blob-num blob-num-addition js-linkable-line-number" data-line-number=""></td>
+              <td class="blob-code blob-code-addition js-file-line">
+                <span class="blob-code-inner blob-code-marker" data-code-marker="+"></span>
+              </td>
+            </tr>
+
+            <!--
+              New heading added, no corresponding deletion on left.
+              Left = empty deletion cell (padding), Right = addition.
+            -->
+            <tr>
+              <td class="blob-num blob-num-deletion js-linkable-line-number" data-line-number=""></td>
+              <td class="blob-code blob-code-deletion js-file-line">
+                <span class="blob-code-inner blob-code-marker" data-code-marker="-"></span>
+              </td>
+              <td class="blob-num blob-num-addition js-linkable-line-number" data-line-number="6"></td>
+              <td class="blob-code blob-code-addition js-file-line">
+                <span class="blob-code-inner blob-code-marker" data-code-marker="+">## How Does It Work?</span>
+              </td>
+            </tr>
+
+            <!-- Context: description line -->
+            <tr>
+              <td class="blob-num blob-num-context js-linkable-line-number" data-line-number="10"></td>
+              <td class="blob-code blob-code-context js-file-line">
+                <span class="blob-code-inner blob-code-marker" data-code-marker=" ">Anyone can add a new component to WipperSnapper by writing a small amount of descriptive JSON and adding an image!</span>
+              </td>
+              <td class="blob-num blob-num-context js-linkable-line-number" data-line-number="7"></td>
+              <td class="blob-code blob-code-context js-file-line">
+                <span class="blob-code-inner blob-code-marker" data-code-marker=" ">Anyone can add a new component to WipperSnapper by writing a small amount of descriptive JSON and adding an image!</span>
+              </td>
+            </tr>
+
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div><!-- .file#diff-readme-split -->
+
+</div><!-- #files -->
+</body>
+</html>

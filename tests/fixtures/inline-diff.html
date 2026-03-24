@@ -1,0 +1,278 @@
+<!DOCTYPE html>
+<!--
+  Fixture: GitHub PR diff page (inline/unified view)
+  Based on: https://github.com/adafruit/Wippersnapper_Components/pull/301/changes
+  File changed: README.md (552 additions, 136 deletions)
+
+  This fixture mirrors the DOM structure GitHub uses for its unified diff view
+  so the bookmarklet can be tested without network access to github.com.
+-->
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="diff-view" content="unified">
+  <title>Rewrite README · Pull Request #301 · adafruit/Wippersnapper_Components</title>
+  <style>
+    body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; margin: 0; padding: 16px; background: #f6f8fa; }
+    .file { border: 1px solid #e1e4e8; border-radius: 6px; margin-bottom: 16px; background: #fff; }
+    .file-header { display: flex; align-items: center; padding: 8px 16px; background: #f6f8fa; border-bottom: 1px solid #e1e4e8; border-radius: 6px 6px 0 0; }
+    .file-info { flex: 1; }
+    .file-actions { display: flex; align-items: center; }
+    .diff-table { width: 100%; border-collapse: collapse; font-family: "SFMono-Regular", Consolas, monospace; font-size: 12px; }
+    .blob-num { width: 1%; min-width: 50px; padding: 0 8px; color: rgba(27,31,35,.3); text-align: right; white-space: nowrap; cursor: pointer; user-select: none; border-right: 1px solid #eaecef; }
+    .blob-code { padding: 0 10px; white-space: pre; }
+    .blob-code-addition { background-color: #cdffd8; }
+    .blob-num-addition  { background-color: #cdffd8; }
+    .blob-code-deletion { background-color: #ffdce0; }
+    .blob-num-deletion  { background-color: #ffdce0; }
+    .blob-code-context  { background-color: #fff; }
+    .blob-code-hunk     { background-color: #dbedff; color: rgba(27,31,35,.7); }
+    .blob-code-inner    { display: inline-block; }
+    a.Link--primary { color: #0366d6; text-decoration: none; font-weight: 600; }
+  </style>
+</head>
+<body>
+<div id="files">
+
+  <!--
+    ============================================================
+    FILE 1: README.md  (markdown — SHOULD be augmented)
+    ============================================================
+    Hunk 1: intro paragraph + heading rename (lines 1–22 of PR #301 patch)
+  -->
+  <div class="file js-details-container" id="diff-readme" data-details-container-group="file">
+    <div class="file-header" data-path="README.md">
+      <div class="file-info flex-auto">
+        <a class="Link--primary" href="#diff-readme" title="README.md">README.md</a>
+        <span style="margin-left:8px;color:#586069;font-size:12px;">+552 -136</span>
+      </div>
+      <div class="file-actions"></div>
+    </div>
+
+    <div class="js-file-content Details-content--shown">
+      <div class="data highlight js-blob-wrapper">
+        <table class="diff-table js-diff-table" data-diff-anchor="diff-readme" cellspacing="0" cellpadding="0">
+          <colgroup>
+            <col class="diff-line-num-col">
+            <col class="diff-line-num-col">
+            <col class="diff-code-col">
+          </colgroup>
+          <tbody>
+
+            <!-- Hunk header -->
+            <tr class="js-expandable-line js-skip-tagsearch">
+              <td colspan="2" class="blob-num blob-num-expandable"></td>
+              <td class="blob-code blob-code-hunk">
+                <span class="blob-code-inner blob-code-hunk">@@ -1,13 +1,12 @@</span>
+              </td>
+            </tr>
+
+            <!-- Context: # Wippersnapper Component Definitions -->
+            <tr>
+              <td class="blob-num blob-num-context js-linkable-line-number" id="diff-readme-L1" data-line-number="1"></td>
+              <td class="blob-num blob-num-context js-linkable-line-number" id="diff-readme-R1" data-line-number="1"></td>
+              <td class="blob-code blob-code-context js-file-line">
+                <span class="blob-code-inner blob-code-marker" data-code-marker=" "># Wippersnapper Component Definitions</span>
+              </td>
+            </tr>
+
+            <!-- Context: blank line -->
+            <tr>
+              <td class="blob-num blob-num-context js-linkable-line-number" id="diff-readme-L2" data-line-number="2"></td>
+              <td class="blob-num blob-num-context js-linkable-line-number" id="diff-readme-R2" data-line-number="2"></td>
+              <td class="blob-code blob-code-context js-file-line">
+                <span class="blob-code-inner blob-code-marker" data-code-marker=" "></span>
+              </td>
+            </tr>
+
+            <!-- Deletion: old intro paragraph (no hyperlink) -->
+            <tr>
+              <td class="blob-num blob-num-deletion js-linkable-line-number" id="diff-readme-L3" data-line-number="3"></td>
+              <td class="blob-num blob-num-deletion js-linkable-line-number" data-line-number=""></td>
+              <td class="blob-code blob-code-deletion js-file-line">
+                <span class="blob-code-inner blob-code-marker" data-code-marker="-">Welcome! This repository contains JSON definition files and images that allow components and sensors to be used with WipperSnapper, Adafruit IO&#39;s no-code IoT service.</span>
+              </td>
+            </tr>
+
+            <!-- Addition: new intro paragraph (with hyperlink) -->
+            <tr>
+              <td class="blob-num blob-num-addition js-linkable-line-number" data-line-number=""></td>
+              <td class="blob-num blob-num-addition js-linkable-line-number" id="diff-readme-R3" data-line-number="3"></td>
+              <td class="blob-code blob-code-addition js-file-line">
+                <span class="blob-code-inner blob-code-marker" data-code-marker="+">Welcome! This repository contains JSON definition files and images that allow components and sensors to be used with [WipperSnapper](https://io.adafruit.com/wippersnapper), Adafruit IO&#39;s no-code IoT service.</span>
+              </td>
+            </tr>
+
+            <!-- Context: link line -->
+            <tr>
+              <td class="blob-num blob-num-context js-linkable-line-number" id="diff-readme-L4" data-line-number="4"></td>
+              <td class="blob-num blob-num-context js-linkable-line-number" id="diff-readme-R4" data-line-number="4"></td>
+              <td class="blob-code blob-code-context js-file-line">
+                <span class="blob-code-inner blob-code-marker" data-code-marker=" ">[Click here to submit suggestions or requests for new Adafruit.io WipperSnapper components >>>](https://github.com/adafruit/WipperSnapper_Components/issues/new/choose)</span>
+              </td>
+            </tr>
+
+            <!-- Context: blank line -->
+            <tr>
+              <td class="blob-num blob-num-context js-linkable-line-number" id="diff-readme-L5" data-line-number="5"></td>
+              <td class="blob-num blob-num-context js-linkable-line-number" id="diff-readme-R5" data-line-number="5"></td>
+              <td class="blob-code blob-code-context js-file-line">
+                <span class="blob-code-inner blob-code-marker" data-code-marker=" "></span>
+              </td>
+            </tr>
+
+            <!-- Deletion: old heading -->
+            <tr>
+              <td class="blob-num blob-num-deletion js-linkable-line-number" id="diff-readme-L8" data-line-number="8"></td>
+              <td class="blob-num blob-num-deletion js-linkable-line-number" data-line-number=""></td>
+              <td class="blob-code blob-code-deletion js-file-line">
+                <span class="blob-code-inner blob-code-marker" data-code-marker="-">## How Will It Work?</span>
+              </td>
+            </tr>
+
+            <!-- Deletion: blank line after old heading -->
+            <tr>
+              <td class="blob-num blob-num-deletion js-linkable-line-number" id="diff-readme-L9" data-line-number="9"></td>
+              <td class="blob-num blob-num-deletion js-linkable-line-number" data-line-number=""></td>
+              <td class="blob-code blob-code-deletion js-file-line">
+                <span class="blob-code-inner blob-code-marker" data-code-marker="-"></span>
+              </td>
+            </tr>
+
+            <!-- Addition: new heading -->
+            <tr>
+              <td class="blob-num blob-num-addition js-linkable-line-number" data-line-number=""></td>
+              <td class="blob-num blob-num-addition js-linkable-line-number" id="diff-readme-R6" data-line-number="6"></td>
+              <td class="blob-code blob-code-addition js-file-line">
+                <span class="blob-code-inner blob-code-marker" data-code-marker="+">## How Does It Work?</span>
+              </td>
+            </tr>
+
+            <!-- Context: description line -->
+            <tr>
+              <td class="blob-num blob-num-context js-linkable-line-number" id="diff-readme-L10" data-line-number="10"></td>
+              <td class="blob-num blob-num-context js-linkable-line-number" id="diff-readme-R7" data-line-number="7"></td>
+              <td class="blob-code blob-code-context js-file-line">
+                <span class="blob-code-inner blob-code-marker" data-code-marker=" ">Anyone can add a new component to WipperSnapper by writing a small amount of descriptive JSON and adding an image! If accepted, a supported component will:</span>
+              </td>
+            </tr>
+
+            <!-- Hunk header 2 -->
+            <tr class="js-expandable-line js-skip-tagsearch">
+              <td colspan="2" class="blob-num blob-num-expandable"></td>
+              <td class="blob-code blob-code-hunk">
+                <span class="blob-code-inner blob-code-hunk">@@ -22,8 +22,25 @@ Anyone can add a new component...</span>
+              </td>
+            </tr>
+
+            <!-- Context: heading -->
+            <tr>
+              <td class="blob-num blob-num-context js-linkable-line-number" data-line-number="22"></td>
+              <td class="blob-num blob-num-context js-linkable-line-number" data-line-number="22"></td>
+              <td class="blob-code blob-code-context js-file-line">
+                <span class="blob-code-inner blob-code-marker" data-code-marker=" ">### And work seamlessly with the rest of IO, including Dashboards and Triggers!</span>
+              </td>
+            </tr>
+
+            <!-- Context: blank line -->
+            <tr>
+              <td class="blob-num blob-num-context js-linkable-line-number" data-line-number="23"></td>
+              <td class="blob-num blob-num-context js-linkable-line-number" data-line-number="23"></td>
+              <td class="blob-code blob-code-context js-file-line">
+                <span class="blob-code-inner blob-code-marker" data-code-marker=" "></span>
+              </td>
+            </tr>
+
+            <!-- Additions: new Repository Structure section -->
+            <tr>
+              <td class="blob-num blob-num-addition js-linkable-line-number" data-line-number=""></td>
+              <td class="blob-num blob-num-addition js-linkable-line-number" data-line-number="24"></td>
+              <td class="blob-code blob-code-addition js-file-line">
+                <span class="blob-code-inner blob-code-marker" data-code-marker="+">## Repository Structure</span>
+              </td>
+            </tr>
+            <tr>
+              <td class="blob-num blob-num-addition js-linkable-line-number" data-line-number=""></td>
+              <td class="blob-num blob-num-addition js-linkable-line-number" data-line-number="25"></td>
+              <td class="blob-code blob-code-addition js-file-line">
+                <span class="blob-code-inner blob-code-marker" data-code-marker="+"></span>
+              </td>
+            </tr>
+            <tr>
+              <td class="blob-num blob-num-addition js-linkable-line-number" data-line-number=""></td>
+              <td class="blob-num blob-num-addition js-linkable-line-number" data-line-number="26"></td>
+              <td class="blob-code blob-code-addition js-file-line">
+                <span class="blob-code-inner blob-code-marker" data-code-marker="+">Each component type directory contains a `definition.json` and an image file.</span>
+              </td>
+            </tr>
+            <tr>
+              <td class="blob-num blob-num-addition js-linkable-line-number" data-line-number=""></td>
+              <td class="blob-num blob-num-addition js-linkable-line-number" data-line-number="27"></td>
+              <td class="blob-code blob-code-addition js-file-line">
+                <span class="blob-code-inner blob-code-marker" data-code-marker="+"></span>
+              </td>
+            </tr>
+
+            <!-- Context: Contributing heading -->
+            <tr>
+              <td class="blob-num blob-num-context js-linkable-line-number" data-line-number="24"></td>
+              <td class="blob-num blob-num-context js-linkable-line-number" data-line-number="28"></td>
+              <td class="blob-code blob-code-context js-file-line">
+                <span class="blob-code-inner blob-code-marker" data-code-marker=" ">## Contributing</span>
+              </td>
+            </tr>
+
+          </tbody>
+        </table>
+      </div><!-- .data -->
+    </div><!-- .js-file-content -->
+  </div><!-- .file#diff-readme -->
+
+
+  <!--
+    ============================================================
+    FILE 2: components/i2c/bmp280/definition.json
+    (NOT a markdown file — should NOT be augmented)
+    ============================================================
+  -->
+  <div class="file js-details-container" id="diff-json" data-details-container-group="file">
+    <div class="file-header" data-path="components/i2c/bmp280/definition.json">
+      <div class="file-info flex-auto">
+        <a class="Link--primary" href="#diff-json" title="components/i2c/bmp280/definition.json">components/i2c/bmp280/definition.json</a>
+        <span style="margin-left:8px;color:#586069;font-size:12px;">+2 -2</span>
+      </div>
+      <div class="file-actions"></div>
+    </div>
+
+    <div class="js-file-content Details-content--shown">
+      <div class="data highlight js-blob-wrapper">
+        <table class="diff-table js-diff-table" cellspacing="0" cellpadding="0">
+          <colgroup>
+            <col class="diff-line-num-col">
+            <col class="diff-line-num-col">
+            <col class="diff-code-col">
+          </colgroup>
+          <tbody>
+            <tr>
+              <td class="blob-num blob-num-deletion js-linkable-line-number" data-line-number="1"></td>
+              <td class="blob-num blob-num-deletion js-linkable-line-number" data-line-number=""></td>
+              <td class="blob-code blob-code-deletion js-file-line">
+                <span class="blob-code-inner blob-code-marker" data-code-marker="-">  &quot;version&quot;: &quot;1.0&quot;,</span>
+              </td>
+            </tr>
+            <tr>
+              <td class="blob-num blob-num-addition js-linkable-line-number" data-line-number=""></td>
+              <td class="blob-num blob-num-addition js-linkable-line-number" data-line-number="1"></td>
+              <td class="blob-code blob-code-addition js-file-line">
+                <span class="blob-code-inner blob-code-marker" data-code-marker="+">  &quot;version&quot;: &quot;1.1&quot;,</span>
+              </td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div><!-- .file#diff-json -->
+
+</div><!-- #files -->
+</body>
+</html>
