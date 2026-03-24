@@ -6,8 +6,8 @@
  * https://github.com/adafruit/Wippersnapper_Components/pull/301/changes
  * (README.md, 552 additions, 136 deletions).
  *
- * marked.js CDN requests are intercepted and fulfilled with a minimal
- * browser-compatible implementation so tests run without internet access.
+ * A minimal snarkdown shim is injected so tests run without the real
+ * markdown parser and without internet access.
  */
 
 const { test, expect } = require('@playwright/test');
@@ -25,12 +25,12 @@ const SPLIT_FIXTURE    = path.resolve(__dirname, 'fixtures/split-diff.html');
 const bookmarkletSource = fs.readFileSync(BOOKMARKLET_PATH, 'utf-8');
 
 /**
- * A minimal marked.js browser shim used to intercept the CDN request.
+ * A minimal snarkdown-compatible browser shim for tests.
  * Handles enough Markdown to verify green/red rendering of PR #301 content.
  */
-const MARKED_SHIM = `
+const SNARKDOWN_SHIM = `
 (function (global) {
-  function parse(text) {
+  function snarkdown(text) {
     if (!text) return '';
     var html = text
       // headings
@@ -41,7 +41,7 @@ const MARKED_SHIM = `
       .replace(/\\*\\*(.+?)\\*\\*/g, '<strong>$1</strong>')
       .replace(/\\*(.+?)\\*/g, '<em>$1</em>')
       // inline code
-      .replace(/\`(.+?)\`/g, '<code>$1</code>')
+      .replace(/\\\`(.+?)\\\`/g, '<code>$1</code>')
       // links
       .replace(/\\[([^\\]]+)\\]\\(([^)]+)\\)/g, '<a href="$2">$1</a>')
       // paragraphs / blank lines
@@ -49,38 +49,31 @@ const MARKED_SHIM = `
       .replace(/\\n/g, '<br>');
     return '<p>' + html + '</p>';
   }
-  global.marked = { parse: parse };
+  global.snarkdown = snarkdown;
 }(window));
 `;
 
 /**
- * Load a local HTML fixture and intercept the marked CDN request.
+ * Load a local HTML fixture and inject the snarkdown shim.
  *
  * @param {import('@playwright/test').Page} page
  * @param {string} fixturePath  Absolute path to the fixture HTML file.
  */
 async function loadFixture(page, fixturePath) {
-  // Intercept any request that looks like the marked CDN URL
-  await page.route('**marked**', route =>
-    route.fulfill({ contentType: 'application/javascript', body: MARKED_SHIM })
-  );
-
   const html = fs.readFileSync(fixturePath, 'utf-8');
   await page.setContent(html, { waitUntil: 'domcontentloaded' });
+
+  // Pre-inject the snarkdown shim so the bookmarklet finds window.snarkdown
+  await page.evaluate(SNARKDOWN_SHIM);
 }
 
 /**
  * Inject the bookmarklet into the page and wait for augmentation to complete.
- * The bookmarklet loads marked.js (intercepted above) asynchronously via a
- * <script> tag, so we wait until `.bookmarklet-toggle-btn` is present.
  *
  * @param {import('@playwright/test').Page} page
  */
 async function runBookmarklet(page) {
   await page.evaluate(bookmarkletSource);
-  // If marked was loaded synchronously (window.marked already set), the
-  // buttons appear immediately.  If not, we wait up to 5 s for the CDN
-  // script tag to load and fire onload.
   await page.waitForSelector('.bookmarklet-toggle-btn', { timeout: 5000 });
 }
 

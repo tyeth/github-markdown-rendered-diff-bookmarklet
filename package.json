@@ -11,5 +11,8 @@
   "devDependencies": {
     "@playwright/test": "^1.40.0",
     "terser": "^5.31.0"
+  },
+  "dependencies": {
+    "snarkdown": "^2.0.0"
   }
 }

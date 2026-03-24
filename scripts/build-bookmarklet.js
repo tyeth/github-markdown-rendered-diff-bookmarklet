@@ -10,19 +10,28 @@ const fs = require('fs');
 const path = require('path');
 const { minify } = require('terser');
 
+const SNARKDOWN_SRC = path.join(__dirname, '..', 'node_modules', 'snarkdown', 'dist', 'snarkdown.umd.js');
 const SRC = path.join(__dirname, '..', 'src', 'bookmarklet.js');
 const DIST_DIR = path.join(__dirname, '..', 'dist');
 const OUT = path.join(DIST_DIR, 'bookmarklet.min.js');
 
 async function build() {
-  const source = fs.readFileSync(SRC, 'utf8');
+  const snarkdownSource = fs.readFileSync(SNARKDOWN_SRC, 'utf8');
+  const bookmarkletSource = fs.readFileSync(SRC, 'utf8');
+
+  // Bundle snarkdown inline before the bookmarklet IIFE
+  const source = snarkdownSource + ';\n' + bookmarkletSource;
 
   const result = await minify(source, {
     compress: {
       booleans_as_integers: false,
-      passes: 2,
+      passes: 3,
+      toplevel: true,
+      unsafe: true,
     },
-    mangle: true,
+    mangle: {
+      toplevel: true,
+    },
     output: {
       ascii_only: true,
       comments: false,

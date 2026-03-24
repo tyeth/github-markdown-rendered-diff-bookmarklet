@@ -13,24 +13,18 @@
 (function () {
   'use strict';
 
-  var MARKED_CDN = 'https://cdn.jsdelivr.net/npm/marked@4/marked.min.js';
-
   /* ------------------------------------------------------------------ */
-  /* Bootstrap — load marked.js from CDN if not already present          */
+  /* Bootstrap                                                            */
   /* ------------------------------------------------------------------ */
 
   function init() {
-    if (typeof window.marked !== 'undefined') {
-      augmentPage();
-    } else {
-      var script = document.createElement('script');
-      script.src = MARKED_CDN;
-      script.onload = augmentPage;
-      script.onerror = function () {
-        console.error('[MD Diff] Failed to load marked.js from ' + MARKED_CDN);
-      };
-      document.head.appendChild(script);
+    // snarkdown is inlined by the build script; also works when loaded
+    // in test environments via evaluate().
+    if (typeof snarkdown === 'undefined' && typeof window.snarkdown === 'undefined') {
+      console.error('[MD Diff] snarkdown is not available. Run the build to inline it.');
+      return;
     }
+    augmentPage();
   }
 
   /* ------------------------------------------------------------------ */
@@ -161,7 +155,8 @@
    */
   function renderChunk(chunk) {
     var markdown = chunk.lines.join('\n');
-    var html = window.marked.parse(markdown);
+    var parse = window.snarkdown || snarkdown;
+    var html = parse(markdown);
 
     var div = document.createElement('div');
     div.className = 'bookmarklet-diff-chunk bookmarklet-diff-chunk--' + chunk.type;
