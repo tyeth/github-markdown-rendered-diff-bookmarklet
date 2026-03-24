@@ -3,11 +3,13 @@
   "version": "1.0.0",
   "description": "A bookmarklet to augment GitHub diff pages with a rendered markdown viewer",
   "scripts": {
+    "build": "node scripts/build-bookmarklet.js",
     "test": "playwright test",
     "test:headed": "playwright test --headed",
     "test:debug": "playwright test --debug"
   },
   "devDependencies": {
-    "@playwright/test": "^1.40.0"
+    "@playwright/test": "^1.40.0",
+    "terser": "^5.31.0"
   }
 }
