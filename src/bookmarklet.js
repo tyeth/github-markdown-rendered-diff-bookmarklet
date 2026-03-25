@@ -327,14 +327,20 @@
         return;
       }
       // Split into separate tables at each separator row (|---|---|)
+      // The row immediately before a separator is the header of that table,
+      // so pop it from the previous table and start a new one.
       var tables = [[]];
       tableRows.forEach(function (row) {
         var stripped = row.replace(/<[^>]*>/g, '').trim();
         if (/^[\s|:-]+$/.test(stripped) && stripped.indexOf('-') !== -1) {
-          // Separator row — if current table already has data rows, start a new table
-          if (tables[tables.length - 1].length > 0) {
+          // Separator row — the last row in the current table is actually
+          // the header for this new table
+          var cur = tables[tables.length - 1];
+          var header = cur.length > 0 ? cur.pop() : null;
+          if (cur.length > 0 || tables.length > 1) {
             tables.push([]);
           }
+          if (header) tables[tables.length - 1].push(header);
           return;
         }
         tables[tables.length - 1].push(row);
