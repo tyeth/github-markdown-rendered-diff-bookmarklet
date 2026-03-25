@@ -326,27 +326,58 @@
         tableRows = [];
         return;
       }
-      var tbl = '<table style="border-collapse:collapse;margin:4px 0">';
-      var headerDone = false;
+      // Split into separate tables at each separator row (|---|---|)
+      var tables = [[]];
       tableRows.forEach(function (row) {
         var stripped = row.replace(/<[^>]*>/g, '').trim();
-        // Skip separator rows (|---|---|)
-        if (/^[\s|:-]+$/.test(stripped) && stripped.indexOf('-') !== -1) return;
-        var tag = !headerDone ? 'th' : 'td';
-        headerDone = true;
-        var cells = stripped.split('|').filter(function (c, i, a) {
-          return i > 0 && i < a.length - 1;
-        });
-        if (cells.length === 0) return;
-        tbl += '<tr>';
-        cells.forEach(function (cell) {
-          tbl += '<' + tag + ' style="border:1px solid currentColor;padding:2px 8px;opacity:0.8">'
-               + cell.trim() + '</' + tag + '>';
-        });
-        tbl += '</tr>';
+        if (/^[\s|:-]+$/.test(stripped) && stripped.indexOf('-') !== -1) {
+          // Separator row — if current table already has data rows, start a new table
+          if (tables[tables.length - 1].length > 0) {
+            tables.push([]);
+          }
+          return;
+        }
+        tables[tables.length - 1].push(row);
       });
-      tbl += '</table>';
-      out.push(tbl);
+
+      tables.forEach(function (rows) {
+        if (rows.length === 0) return;
+        var tbl = '<table style="border-collapse:collapse;margin:4px 0">';
+        rows.forEach(function (row, rowIdx) {
+          var tag = rowIdx === 0 ? 'th' : 'td';
+          // Protect | inside <code> tags before splitting
+          var safe = row.replace(/<code[^>]*>[\s\S]*?<\/code>/g, function (m) {
+            return m.replace(/\|/g, '\x00P\x00');
+          });
+          // Split the HTML on | that are outside tags
+          var parts = [];
+          var current = '', inTag = false;
+          for (var ci = 0; ci < safe.length; ci++) {
+            var ch = safe.charAt(ci);
+            if (ch === '<') inTag = true;
+            else if (ch === '>') inTag = false;
+            if (ch === '|' && !inTag) {
+              parts.push(current);
+              current = '';
+            } else {
+              current += ch;
+            }
+          }
+          parts.push(current);
+          // First and last parts are outside the table pipes — skip them
+          var cells = parts.slice(1, -1);
+          if (cells.length === 0) return;
+          tbl += '<tr>';
+          cells.forEach(function (cell) {
+            cell = cell.replace(/\x00P\x00/g, '|').trim();
+            tbl += '<' + tag + ' style="border:1px solid currentColor;padding:2px 8px;opacity:0.8">'
+                 + cell + '</' + tag + '>';
+          });
+          tbl += '</tr>';
+        });
+        tbl += '</table>';
+        out.push(tbl);
+      });
       tableRows = [];
     }
 
