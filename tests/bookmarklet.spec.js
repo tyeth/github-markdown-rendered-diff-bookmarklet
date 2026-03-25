@@ -18,9 +18,10 @@ const fs = require('fs');
 // Helpers
 // ---------------------------------------------------------------------------
 
-const BOOKMARKLET_PATH   = path.resolve(__dirname, '../src/bookmarklet.js');
-const PR_REACT_FIXTURE   = path.resolve(__dirname, 'fixtures/pr-changes-react.html');
+const BOOKMARKLET_PATH     = path.resolve(__dirname, '../src/bookmarklet.js');
+const PR_REACT_FIXTURE     = path.resolve(__dirname, 'fixtures/pr-changes-react.html');
 const TREE_CLASSIC_FIXTURE = path.resolve(__dirname, 'fixtures/tree-compare-classic.html');
+const TREE_SPLIT_FIXTURE   = path.resolve(__dirname, 'fixtures/tree-compare-split.html');
 
 const bookmarkletSource = fs.readFileSync(BOOKMARKLET_PATH, 'utf-8');
 
@@ -266,6 +267,104 @@ test.describe('Tree compare page (classic UI)', () => {
     const rendered = page.locator('.bookmarklet-rendered-diff').first();
     // The README.md in this compare has "ProtoMQ" heading
     await expect(rendered).toContainText('ProtoMQ');
+  });
+
+  test('does not augment the page twice when the bookmarklet runs again', async ({ page }) => {
+    await runBookmarklet(page);
+    const countBefore = await page.locator('.bookmarklet-toggle-btn').count();
+
+    await page.evaluate(bookmarkletSource);
+    const countAfter = await page.locator('.bookmarklet-toggle-btn').count();
+
+    expect(countAfter).toBe(countBefore);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Tests: Tree compare page — split (side-by-side) view
+// Same repo as classic but with ?diff=split
+// ---------------------------------------------------------------------------
+
+test.describe('Tree compare page (split view)', () => {
+  test.beforeEach(async ({ page }) => {
+    await loadFixture(page, TREE_SPLIT_FIXTURE);
+  });
+
+  test('adds toggle button(s) only to .md file diffs', async ({ page }) => {
+    await runBookmarklet(page);
+
+    const buttons = page.locator('.bookmarklet-toggle-btn');
+    const count = await buttons.count();
+    expect(count).toBeGreaterThanOrEqual(1);
+
+    // No .json or .js file should have a toggle button
+    const jsonFiles = page.locator('.file[data-file-type=".json"] .bookmarklet-toggle-btn');
+    await expect(jsonFiles).toHaveCount(0);
+  });
+
+  test('clicking toggle shows rendered diff and hides code table', async ({ page }) => {
+    await runBookmarklet(page);
+
+    const btn = page.locator('.bookmarklet-toggle-btn').first();
+    await btn.click();
+
+    await expect(page.locator('.bookmarklet-rendered-diff').first()).toBeVisible();
+    await expect(btn).toHaveText('Show Code Diff');
+  });
+
+  test('rendered diff uses a table with left and right cells', async ({ page }) => {
+    await runBookmarklet(page);
+    await page.locator('.bookmarklet-toggle-btn').first().click();
+
+    const rendered = page.locator('.bookmarklet-rendered-diff').first();
+
+    // Should have a split table with rows
+    const splitTable = rendered.locator('.bookmarklet-split-table');
+    await expect(splitTable).toHaveCount(1);
+
+    // Rows should have left and right cells
+    const leftCells = rendered.locator('.bookmarklet-split-left');
+    const rightCells = rendered.locator('.bookmarklet-split-right');
+    await expect(leftCells).not.toHaveCount(0);
+    await expect(rightCells).not.toHaveCount(0);
+  });
+
+  test('left cells have deletions, right cells have additions', async ({ page }) => {
+    await runBookmarklet(page);
+    await page.locator('.bookmarklet-toggle-btn').first().click();
+
+    const leftDels = page.locator('td.bookmarklet-split-left .bookmarklet-diff-chunk--delete');
+    const rightAdds = page.locator('td.bookmarklet-split-right .bookmarklet-diff-chunk--add');
+
+    await expect(leftDels).not.toHaveCount(0);
+    await expect(rightAdds).not.toHaveCount(0);
+
+    // Additions should NOT be in left cells, deletions NOT in right
+    const leftAdds = page.locator('td.bookmarklet-split-left .bookmarklet-diff-chunk--add');
+    const rightDels = page.locator('td.bookmarklet-split-right .bookmarklet-diff-chunk--delete');
+    await expect(leftAdds).toHaveCount(0);
+    await expect(rightDels).toHaveCount(0);
+  });
+
+  test('context appears on both sides in split view', async ({ page }) => {
+    await runBookmarklet(page);
+    await page.locator('.bookmarklet-toggle-btn').first().click();
+
+    const leftCtx = page.locator('td.bookmarklet-split-left .bookmarklet-diff-chunk--context');
+    const rightCtx = page.locator('td.bookmarklet-split-right .bookmarklet-diff-chunk--context');
+
+    await expect(leftCtx).not.toHaveCount(0);
+    await expect(rightCtx).not.toHaveCount(0);
+  });
+
+  test('word-level highlighting produces <mark> elements', async ({ page }) => {
+    await runBookmarklet(page);
+    await page.locator('.bookmarklet-toggle-btn').first().click();
+
+    // The README changes "protomq" -> "ProtoMQ" — should produce <mark> highlights
+    const marks = page.locator('.bookmarklet-rendered-diff mark');
+    const count = await marks.count();
+    expect(count).toBeGreaterThan(0);
   });
 
   test('does not augment the page twice when the bookmarklet runs again', async ({ page }) => {

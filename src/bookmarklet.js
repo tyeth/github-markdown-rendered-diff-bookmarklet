@@ -50,7 +50,9 @@
         delBg:          'rgba(248,81,73,0.15)',
         delBorder:      '#da3633',
         delWordBg:      'rgba(248,81,73,0.40)',
-        fg:             '#e6edf3'
+        fg:             '#e6edf3',
+        codeBg:         'rgba(110,118,129,0.4)',
+        codeBorder:     'rgba(110,118,129,0.3)'
       };
     }
     return {
@@ -62,7 +64,9 @@
       delBg:          '#ffebe9',
       delBorder:      '#cb2431',
       delWordBg:      '#ff8182',
-      fg:             '#1f2328'
+      fg:             '#1f2328',
+      codeBg:         'rgba(175,184,193,0.2)',
+      codeBorder:     'rgba(31,35,40,0.15)'
     };
   }
 
@@ -296,9 +300,88 @@
   }
 
   /**
-   * Applies word-level highlighting to a chunk's HTML.
-   * When a delete chunk is immediately followed by an add chunk, we diff
-   * the raw text word-by-word and wrap changed segments with <mark>.
+   * Converts any pipe-table rows found in rendered HTML to proper <table> elements.
+   * Works as a post-processor on the final HTML so it handles table rows that
+   * were split across hunks or chunks. Looks for lines matching `| ... | ... |`
+   * patterns in text nodes / <p> / <br>-separated content.
+   *
+   * @param {string} html
+   * @returns {string}
+   */
+  function postProcessTables(html) {
+    // Split on block boundaries so pipe-table rows land on their own lines
+    var lines = html
+      .replace(/<\/p>\s*<p>/g, '\n')
+      .replace(/<br\s*\/?>/g, '\n')
+      .replace(/(<\/h[1-6]>|<\/div>|<\/blockquote>|<\/pre>|<\/ul>|<\/ol>|<\/table>)/g, '$1\n')
+      .replace(/(<h[1-6][^>]*>|<div[^>]*>|<blockquote[^>]*>|<pre[^>]*>|<ul[^>]*>|<ol[^>]*>)/g, '\n$1')
+      .split('\n');
+    var out = [];
+    var tableRows = [];
+
+    function flushTable() {
+      if (tableRows.length < 2) {
+        // Not enough rows for a table — emit as-is
+        tableRows.forEach(function (r) { out.push(r); });
+        tableRows = [];
+        return;
+      }
+      var tbl = '<table style="border-collapse:collapse;margin:4px 0">';
+      var headerDone = false;
+      tableRows.forEach(function (row) {
+        var stripped = row.replace(/<[^>]*>/g, '').trim();
+        // Skip separator rows (|---|---|)
+        if (/^[\s|:-]+$/.test(stripped) && stripped.indexOf('-') !== -1) return;
+        var tag = !headerDone ? 'th' : 'td';
+        headerDone = true;
+        var cells = stripped.split('|').filter(function (c, i, a) {
+          return i > 0 && i < a.length - 1;
+        });
+        if (cells.length === 0) return;
+        tbl += '<tr>';
+        cells.forEach(function (cell) {
+          tbl += '<' + tag + ' style="border:1px solid currentColor;padding:2px 8px;opacity:0.8">'
+               + cell.trim() + '</' + tag + '>';
+        });
+        tbl += '</tr>';
+      });
+      tbl += '</table>';
+      out.push(tbl);
+      tableRows = [];
+    }
+
+    lines.forEach(function (line) {
+      var stripped = line.replace(/<[^>]*>/g, '').trim();
+      if (/^\|.+\|$/.test(stripped)) {
+        tableRows.push(line);
+      } else {
+        if (tableRows.length > 0) flushTable();
+        out.push(line);
+      }
+    });
+    if (tableRows.length > 0) flushTable();
+    if (tableRows.length > 0) flushTable();
+
+    return out.join('');
+  }
+
+  /**
+   * Parses markdown to HTML using snarkdown, then post-processes to convert
+   * any pipe tables that snarkdown doesn't handle.
+   *
+   * @param {string} text
+   * @returns {string}
+   */
+  function parseMarkdown(text) {
+    var parse = window.snarkdown || snarkdown;
+    return postProcessTables(parse(text));
+  }
+
+  /**
+   * Applies word-level highlighting to a chunk's rendered HTML.
+   * Parses markdown first, then diffs the plain-text content of the
+   * rendered HTML against the paired chunk to find changed words,
+   * and wraps them with <mark> in the final output.
    *
    * @param {string} markdown  The raw markdown text for this chunk
    * @param {string|null} pairMarkdown  The paired chunk's text (del for add, add for del)
@@ -306,24 +389,40 @@
    * @returns {string}  HTML string
    */
   function renderMarkdownWithHighlights(markdown, pairMarkdown, wordBg) {
-    var parse = window.snarkdown || snarkdown;
-    if (!pairMarkdown) return parse(markdown);
+    var html = parseMarkdown(markdown);
+    if (!pairMarkdown) return html;
 
+    // Diff on the raw markdown text to find changed words
     var segments = diffWords(pairMarkdown, markdown);
-    if (!segments) return parse(markdown);
+    if (!segments) return html;
 
-    // Build highlighted plain text, then parse
-    var highlighted = segments.map(function (seg) {
+    // Build a set of changed words/phrases from the markdown
+    var changedTexts = [];
+    segments.forEach(function (seg) {
       if (seg.changed && seg.text.trim()) {
-        return '⟪HLSTART⟫' + seg.text + '⟪HLEND⟫';
+        // Split into individual words for matching in HTML
+        seg.text.split(/(\s+)/).forEach(function (w) {
+          if (w.trim()) changedTexts.push(w.trim());
+        });
       }
-      return seg.text;
-    }).join('');
+    });
+    if (changedTexts.length === 0) return html;
 
-    var html = parse(highlighted);
-    // Replace markers with <mark> tags (markers survive markdown parsing)
-    html = html.replace(/⟪HLSTART⟫/g, '<mark style="background:' + wordBg + ';border-radius:3px;padding:0 1px">')
-               .replace(/⟪HLEND⟫/g, '</mark>');
+    // Escape for regex and build pattern matching any changed word
+    var escaped = changedTexts.map(function (t) {
+      return t.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    });
+    // Sort longest first to match greedily
+    escaped.sort(function (a, b) { return b.length - a.length; });
+    var pattern = new RegExp('(' + escaped.join('|') + ')', 'g');
+
+    // Apply highlights only to text nodes (not inside tags)
+    var markOpen = '<mark style="background:' + wordBg + ';border-radius:3px;padding:0 1px">';
+    html = html.replace(/(<[^>]*>)|([^<]+)/g, function (m, tag, text) {
+      if (tag) return tag;
+      return text.replace(pattern, markOpen + '$1</mark>');
+    });
+
     return html;
   }
 
@@ -346,62 +445,159 @@
       div.innerHTML = renderMarkdownWithHighlights(markdown, pairMarkdown, colors.addWordBg);
       div.style.backgroundColor = colors.addBg;
       div.style.borderLeft = '4px solid ' + colors.addBorder;
-      div.style.paddingLeft = '8px';
-      div.style.margin = '2px 0';
+      div.style.padding = '2px 8px 2px 24px';
     } else if (chunk.type === 'delete') {
       div.innerHTML = renderMarkdownWithHighlights(markdown, pairMarkdown, colors.delWordBg);
       div.style.backgroundColor = colors.delBg;
       div.style.borderLeft = '4px solid ' + colors.delBorder;
-      div.style.paddingLeft = '8px';
-      div.style.margin = '2px 0';
+      div.style.padding = '2px 8px 2px 24px';
     } else {
-      div.innerHTML = (window.snarkdown || snarkdown)(markdown);
-      div.style.paddingLeft = '12px';
-      div.style.margin = '2px 0';
+      div.innerHTML = parseMarkdown(markdown);
+      div.style.padding = '2px 8px 2px 28px';
+    }
+
+    // Ensure lists aren't clipped against the left edge
+    var lists = div.querySelectorAll('ul, ol');
+    for (var li = 0; li < lists.length; li++) {
+      lists[li].style.paddingInlineStart = '20px';
+    }
+
+    // Style inline code
+    var codes = div.querySelectorAll('code');
+    for (var ci = 0; ci < codes.length; ci++) {
+      var c = codes[ci];
+      // Skip if inside a <pre> (block code gets styled on the pre)
+      if (c.parentNode && c.parentNode.nodeName === 'PRE') continue;
+      c.style.background = colors.codeBg;
+      c.style.border = '1px solid ' + colors.codeBorder;
+      c.style.borderRadius = '6px';
+      c.style.padding = '0.2em 0.4em';
+      c.style.fontSize = '85%';
+      c.style.fontFamily = 'ui-monospace,SFMono-Regular,SF Mono,Menlo,Consolas,Liberation Mono,monospace';
+    }
+
+    // Style code blocks
+    var pres = div.querySelectorAll('pre');
+    for (var pi = 0; pi < pres.length; pi++) {
+      pres[pi].style.background = colors.codeBg;
+      pres[pi].style.border = '1px solid ' + colors.codeBorder;
+      pres[pi].style.borderRadius = '6px';
+      pres[pi].style.padding = '12px';
+      pres[pi].style.overflow = 'auto';
+      pres[pi].style.fontSize = '85%';
+      pres[pi].style.fontFamily = 'ui-monospace,SFMono-Regular,SF Mono,Menlo,Consolas,Liberation Mono,monospace';
     }
 
     return div;
   }
 
   /**
+   * Applies shared wrapper styles.
+   */
+  function styleWrapper(el, colors) {
+    el.style.fontFamily =
+      '-apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, Arial, sans-serif';
+    el.style.fontSize = '14px';
+    el.style.lineHeight = '1.5';
+    el.style.border = '1px solid ' + colors.wrapperBorder;
+    el.style.borderRadius = '3px';
+    el.style.background = colors.wrapperBg;
+    el.style.color = colors.fg;
+    el.style.overflowX = 'auto';
+  }
+
+  /**
+   * Populates a container with chunks, pairing adjacent delete→add for
+   * word-level highlighting.
+   */
+  function appendChunks(container, chunks, colors) {
+    for (var i = 0; i < chunks.length; i++) {
+      var chunk = chunks[i];
+      if (chunk.type === 'delete' && i + 1 < chunks.length && chunks[i + 1].type === 'add') {
+        container.appendChild(renderChunk(chunk, chunks[i + 1], colors));
+        i++;
+        container.appendChild(renderChunk(chunks[i], chunks[i - 1], colors));
+      } else {
+        container.appendChild(renderChunk(chunk, null, colors));
+      }
+    }
+  }
+
+  /**
    * Builds the complete rendered-diff container from an array of diff lines.
+   * When isSplit is true, renders two side-by-side panes (old on left, new
+   * on right) to match GitHub's split diff layout.
    *
    * @param {Array<{type: string, content: string}>} lines
+   * @param {boolean} isSplit
    * @returns {HTMLElement}
    */
-  function createRenderedDiffView(lines) {
+  function createRenderedDiffView(lines, isSplit) {
     var chunks = buildChunks(lines);
     var colors = getThemeColors();
 
     var wrapper = document.createElement('div');
     wrapper.className = 'bookmarklet-rendered-diff';
-    wrapper.style.fontFamily =
-      '-apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, Arial, sans-serif';
-    wrapper.style.fontSize = '14px';
-    wrapper.style.lineHeight = '1.5';
-    wrapper.style.border = '1px solid ' + colors.wrapperBorder;
-    wrapper.style.borderRadius = '3px';
-    wrapper.style.background = colors.wrapperBg;
-    wrapper.style.color = colors.fg;
-    wrapper.style.padding = '10px 0';
-    wrapper.style.overflowX = 'auto';
 
-    // Pair adjacent delete→add chunks for word-level highlighting
+    if (!isSplit) {
+      // Unified view — single column
+      styleWrapper(wrapper, colors);
+      wrapper.style.padding = '10px 0';
+      appendChunks(wrapper, chunks, colors);
+      return wrapper;
+    }
+
+    // Split view — table layout so each row stays horizontally aligned
+    styleWrapper(wrapper, colors);
+    wrapper.style.padding = '0';
+
+    var tbl = document.createElement('table');
+    tbl.className = 'bookmarklet-split-table';
+    tbl.style.width = '100%';
+    tbl.style.borderCollapse = 'collapse';
+    tbl.style.tableLayout = 'fixed';
+
+    function makeCell(chunk, pairChunk) {
+      var td = document.createElement('td');
+      td.style.width = '50%';
+      td.style.verticalAlign = 'top';
+      td.style.padding = '0';
+      if (chunk) {
+        td.appendChild(renderChunk(chunk, pairChunk, colors));
+      }
+      return td;
+    }
+
+    function addRow(leftChunk, rightChunk, leftPair, rightPair) {
+      var tr = document.createElement('tr');
+      var leftTd = makeCell(leftChunk, leftPair);
+      var rightTd = makeCell(rightChunk, rightPair);
+      rightTd.style.borderLeft = '1px solid ' + colors.wrapperBorder;
+      // Tag panes for test selectors
+      if (leftChunk) leftTd.className = 'bookmarklet-split-left';
+      if (rightChunk) rightTd.className = 'bookmarklet-split-right';
+      tr.appendChild(leftTd);
+      tr.appendChild(rightTd);
+      tbl.appendChild(tr);
+    }
+
+    // Walk chunks, emitting aligned rows
     for (var i = 0; i < chunks.length; i++) {
-      var chunk = chunks[i];
-      var pairChunk = null;
-
-      if (chunk.type === 'delete' && i + 1 < chunks.length && chunks[i + 1].type === 'add') {
-        pairChunk = chunks[i + 1]; // pair: del sees add
-        wrapper.appendChild(renderChunk(chunk, pairChunk, colors));
-        // Now render the add chunk paired with the del
+      var c = chunks[i];
+      if (c.type === 'context') {
+        addRow(c, c, null, null);
+      } else if (c.type === 'delete' && i + 1 < chunks.length && chunks[i + 1].type === 'add') {
+        // Paired del→add on same row with word highlights
+        addRow(c, chunks[i + 1], chunks[i + 1], c);
         i++;
-        wrapper.appendChild(renderChunk(chunks[i], chunk, colors));
-      } else {
-        wrapper.appendChild(renderChunk(chunk, null, colors));
+      } else if (c.type === 'delete') {
+        addRow(c, null, null, null);
+      } else if (c.type === 'add') {
+        addRow(null, c, null, null);
       }
     }
 
+    wrapper.appendChild(tbl);
     return wrapper;
   }
 
@@ -557,7 +753,8 @@
       container.dataset.mdDiffAugmented = 'true';
 
       // Build the rendered view (hidden initially)
-      var renderedDiff = createRenderedDiffView(lines);
+      var isSplit = table.classList.contains('file-diff-split');
+      var renderedDiff = createRenderedDiffView(lines, isSplit);
       renderedDiff.style.display = 'none';
 
       // Insert rendered view after the table (or its wrapper)
