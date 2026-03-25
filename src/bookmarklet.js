@@ -350,7 +350,15 @@
       tableRows = [];
     }
 
+    var inPre = false;
     lines.forEach(function (line) {
+      if (/<pre[\s>]/i.test(line)) inPre = true;
+      if (inPre) {
+        if (tableRows.length > 0) flushTable();
+        out.push(line);
+        if (/<\/pre>/i.test(line)) inPre = false;
+        return;
+      }
       var stripped = line.replace(/<[^>]*>/g, '').trim();
       if (/^\|.+\|$/.test(stripped)) {
         tableRows.push(line);
@@ -359,7 +367,6 @@
         out.push(line);
       }
     });
-    if (tableRows.length > 0) flushTable();
     if (tableRows.length > 0) flushTable();
 
     return out.join('');
@@ -372,9 +379,79 @@
    * @param {string} text
    * @returns {string}
    */
+  /**
+   * Fixes orphaned code fences before markdown parsing. When diff chunks
+   * split a fenced code block across type boundaries, one chunk gets the
+   * opening ``` and another gets the closing ```. Snarkdown can't match
+   * these, so we manually wrap the orphaned content in <pre><code>.
+   */
+  function fixOrphanedFences(text) {
+    var lines = text.split('\n');
+    var result = [];
+    var inFence = false;
+    var fenceContent = [];
+
+    for (var i = 0; i < lines.length; i++) {
+      var line = lines[i];
+      var isFence = /^`{3,}/.test(line.trim());
+
+      if (isFence && !inFence) {
+        // Opening fence — check if there's a matching close
+        var hasClose = false;
+        for (var j = i + 1; j < lines.length; j++) {
+          if (/^`{3,}\s*$/.test(lines[j].trim())) { hasClose = true; break; }
+        }
+        if (hasClose) {
+          // Balanced — pass through for snarkdown to handle
+          result.push(line);
+          inFence = true;
+        } else {
+          // Orphaned opening fence — collect everything after as <pre>
+          var lang = line.trim().replace(/^`{3,}\s*/, '');
+          var codeLines = [];
+          for (i++; i < lines.length; i++) { codeLines.push(lines[i]); }
+          var escaped = codeLines.join('\n').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+          result.push('<pre class="code ' + lang + '"><code>' + escaped + '</code></pre>');
+        }
+      } else if (isFence && inFence) {
+        // Closing fence
+        result.push(line);
+        inFence = false;
+      } else if (!inFence && i === 0 && !isFence) {
+        // Check: does this chunk start mid-code-block? That happens when
+        // a code fence was opened in a previous chunk and this chunk has
+        // the closing fence. We detect this by: the first fence is a bare
+        // ``` (no language), AND no line before it looks like markdown
+        // (headings, lists, etc.) — just plain text/code.
+        var firstFenceIdx = -1;
+        for (var k = 0; k < lines.length; k++) {
+          if (/^`{3,}/.test(lines[k].trim())) { firstFenceIdx = k; break; }
+        }
+        var looksLikeCode = firstFenceIdx > 0 && /^`{3,}\s*$/.test(lines[firstFenceIdx].trim());
+        // If any line before the fence looks like markdown, it's not orphaned code
+        if (looksLikeCode) {
+          for (var k2 = 0; k2 < firstFenceIdx; k2++) {
+            if (/^#{1,6}\s|^\s*[-*+]\s|^\|/.test(lines[k2])) { looksLikeCode = false; break; }
+          }
+        }
+        if (looksLikeCode) {
+          var codePart = lines.slice(0, firstFenceIdx);
+          var escaped = codePart.join('\n').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+          result.push('<pre class="code"><code>' + escaped + '</code></pre>');
+          i = firstFenceIdx; // skip past the closing fence
+        } else {
+          result.push(line);
+        }
+      } else {
+        result.push(line);
+      }
+    }
+    return result.join('\n');
+  }
+
   function parseMarkdown(text) {
     var parse = window.snarkdown || snarkdown;
-    return postProcessTables(parse(text));
+    return postProcessTables(parse(fixOrphanedFences(text)));
   }
 
   /**
@@ -547,9 +624,30 @@
       return wrapper;
     }
 
-    // Split view — table layout so each row stays horizontally aligned
+    // Split view: In split diffs, lines from the left (delete) and right (add)
+    // sides are interleaved row-by-row. This produces many tiny 1-line chunks
+    // that break markdown rendering (tables, code blocks span multiple lines).
+    // Fix: collect left-side lines (delete+context) and right-side lines
+    // (add+context) separately, build proper chunks for each side, then
+    // render them in a two-column table layout.
     styleWrapper(wrapper, colors);
     wrapper.style.padding = '0';
+
+    var leftLines = [];
+    var rightLines = [];
+    lines.forEach(function (line) {
+      if (line.type === 'context') {
+        leftLines.push(line);
+        rightLines.push(line);
+      } else if (line.type === 'delete') {
+        leftLines.push(line);
+      } else if (line.type === 'add') {
+        rightLines.push(line);
+      }
+    });
+
+    var leftChunks = buildChunks(leftLines);
+    var rightChunks = buildChunks(rightLines);
 
     var tbl = document.createElement('table');
     tbl.className = 'bookmarklet-split-table';
@@ -557,46 +655,25 @@
     tbl.style.borderCollapse = 'collapse';
     tbl.style.tableLayout = 'fixed';
 
-    function makeCell(chunk, pairChunk) {
+    function makePane(paneChunks) {
       var td = document.createElement('td');
       td.style.width = '50%';
       td.style.verticalAlign = 'top';
-      td.style.padding = '0';
-      if (chunk) {
-        td.appendChild(renderChunk(chunk, pairChunk, colors));
-      }
+      td.style.padding = '10px 0';
+      appendChunks(td, paneChunks, colors);
       return td;
     }
 
-    function addRow(leftChunk, rightChunk, leftPair, rightPair) {
-      var tr = document.createElement('tr');
-      var leftTd = makeCell(leftChunk, leftPair);
-      var rightTd = makeCell(rightChunk, rightPair);
-      rightTd.style.borderLeft = '1px solid ' + colors.wrapperBorder;
-      // Tag panes for test selectors
-      if (leftChunk) leftTd.className = 'bookmarklet-split-left';
-      if (rightChunk) rightTd.className = 'bookmarklet-split-right';
-      tr.appendChild(leftTd);
-      tr.appendChild(rightTd);
-      tbl.appendChild(tr);
-    }
+    var tr = document.createElement('tr');
+    var leftTd = makePane(leftChunks);
+    leftTd.className = 'bookmarklet-split-left';
+    var rightTd = makePane(rightChunks);
+    rightTd.className = 'bookmarklet-split-right';
+    rightTd.style.borderLeft = '1px solid ' + colors.wrapperBorder;
 
-    // Walk chunks, emitting aligned rows
-    for (var i = 0; i < chunks.length; i++) {
-      var c = chunks[i];
-      if (c.type === 'context') {
-        addRow(c, c, null, null);
-      } else if (c.type === 'delete' && i + 1 < chunks.length && chunks[i + 1].type === 'add') {
-        // Paired del→add on same row with word highlights
-        addRow(c, chunks[i + 1], chunks[i + 1], c);
-        i++;
-      } else if (c.type === 'delete') {
-        addRow(c, null, null, null);
-      } else if (c.type === 'add') {
-        addRow(null, c, null, null);
-      }
-    }
-
+    tr.appendChild(leftTd);
+    tr.appendChild(rightTd);
+    tbl.appendChild(tr);
     wrapper.appendChild(tbl);
     return wrapper;
   }

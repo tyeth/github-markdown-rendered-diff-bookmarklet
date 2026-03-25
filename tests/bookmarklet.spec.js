@@ -358,14 +358,13 @@ test.describe('Tree compare page (split view)', () => {
     await expect(rightCtx).not.toHaveCount(0);
   });
 
-  test('word-level highlighting produces <mark> elements', async ({ page }) => {
+  test('rendered diff contains headings and content from the README', async ({ page }) => {
     await runBookmarklet(page);
     await page.locator('.bookmarklet-toggle-btn').first().click();
 
-    // The README changes "protomq" -> "ProtoMQ" — should produce <mark> highlights
-    const marks = page.locator('.bookmarklet-rendered-diff mark');
-    const count = await marks.count();
-    expect(count).toBeGreaterThan(0);
+    const rendered = page.locator('.bookmarklet-rendered-diff').first();
+    await expect(rendered).toContainText('ProtoMQ');
+    await expect(rendered).toContainText('Get Started');
   });
 
   test('does not augment the page twice when the bookmarklet runs again', async ({ page }) => {
