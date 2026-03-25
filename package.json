@@ -1,6 +1,6 @@
 {
   "name": "github-markdown-rendered-diff-bookmarklet",
-  "version": "1.0.0",
+  "version": "0.0.1",
   "description": "A bookmarklet to augment GitHub diff pages with a rendered markdown viewer",
   "scripts": {
     "build": "node scripts/build-bookmarklet.js",

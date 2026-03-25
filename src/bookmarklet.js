@@ -685,30 +685,41 @@
       return wrapper;
     }
 
-    // Split view: In split diffs, lines from the left (delete) and right (add)
-    // sides are interleaved row-by-row. This produces many tiny 1-line chunks
-    // that break markdown rendering (tables, code blocks span multiple lines).
-    // Fix: collect left-side lines (delete+context) and right-side lines
-    // (add+context) separately, build proper chunks for each side, then
-    // render them in a two-column table layout.
+    // Split view: render each diff "section" as its own table row so that
+    // context blocks align horizontally between the two panes. A section is:
+    //   - consecutive context lines → both sides
+    //   - consecutive delete lines (optionally followed by adds) → left/right
+    //   - consecutive add lines (not after deletes) → right only
     styleWrapper(wrapper, colors);
     wrapper.style.padding = '0';
 
-    var leftLines = [];
-    var rightLines = [];
+    // Group lines into sections. Context lines create alignment boundaries;
+    // any continuous run of delete/add lines between context blocks is a
+    // single section with all deletes on the left and all adds on the right.
+    // This keeps multi-line markdown constructs (tables, code blocks) intact.
+    var sections = [];
+    var cur = null;
     lines.forEach(function (line) {
       if (line.type === 'context') {
-        leftLines.push(line);
-        rightLines.push(line);
-      } else if (line.type === 'delete') {
-        leftLines.push(line);
-      } else if (line.type === 'add') {
-        rightLines.push(line);
+        if (!cur || cur.phase !== 'context') {
+          cur = { phase: 'context', left: [], right: [] };
+          sections.push(cur);
+        }
+        cur.left.push(line);
+        cur.right.push(line);
+      } else {
+        // delete or add — accumulate into the same "change" section
+        if (!cur || cur.phase === 'context') {
+          cur = { phase: 'change', left: [], right: [] };
+          sections.push(cur);
+        }
+        if (line.type === 'delete') {
+          cur.left.push(line);
+        } else {
+          cur.right.push(line);
+        }
       }
     });
-
-    var leftChunks = buildChunks(leftLines);
-    var rightChunks = buildChunks(rightLines);
 
     var tbl = document.createElement('table');
     tbl.className = 'bookmarklet-split-table';
@@ -716,25 +727,36 @@
     tbl.style.borderCollapse = 'collapse';
     tbl.style.tableLayout = 'fixed';
 
-    function makePane(paneChunks) {
-      var td = document.createElement('td');
-      td.style.width = '50%';
-      td.style.verticalAlign = 'top';
-      td.style.padding = '10px 0';
-      appendChunks(td, paneChunks, colors);
-      return td;
-    }
+    sections.forEach(function (section) {
+      var tr = document.createElement('tr');
 
-    var tr = document.createElement('tr');
-    var leftTd = makePane(leftChunks);
-    leftTd.className = 'bookmarklet-split-left';
-    var rightTd = makePane(rightChunks);
-    rightTd.className = 'bookmarklet-split-right';
-    rightTd.style.borderLeft = '1px solid ' + colors.wrapperBorder;
+      var leftTd = document.createElement('td');
+      leftTd.className = 'bookmarklet-split-left';
+      leftTd.style.width = '50%';
+      leftTd.style.verticalAlign = 'top';
+      leftTd.style.padding = '4px 0';
 
-    tr.appendChild(leftTd);
-    tr.appendChild(rightTd);
-    tbl.appendChild(tr);
+      var rightTd = document.createElement('td');
+      rightTd.className = 'bookmarklet-split-right';
+      rightTd.style.width = '50%';
+      rightTd.style.verticalAlign = 'top';
+      rightTd.style.padding = '4px 0';
+      rightTd.style.borderLeft = '1px solid ' + colors.wrapperBorder;
+
+      if (section.left.length > 0) {
+        var leftChunks = buildChunks(section.left);
+        appendChunks(leftTd, leftChunks, colors);
+      }
+      if (section.right.length > 0) {
+        var rightChunks = buildChunks(section.right);
+        appendChunks(rightTd, rightChunks, colors);
+      }
+
+      tr.appendChild(leftTd);
+      tr.appendChild(rightTd);
+      tbl.appendChild(tr);
+    });
+
     wrapper.appendChild(tbl);
     return wrapper;
   }
