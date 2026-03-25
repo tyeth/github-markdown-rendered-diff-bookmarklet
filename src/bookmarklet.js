@@ -493,7 +493,11 @@
 
   function parseMarkdown(text) {
     var parse = window.snarkdown || snarkdown;
-    return postProcessTables(parse(fixOrphanedFences(text)));
+    // Pre-process: convert horizontal rules (snarkdown doesn't support them)
+    var processed = fixOrphanedFences(text).replace(
+      /^[ \t]*([-*_])[ \t]*\1[ \t]*\1[ \t]*$/gm, '<hr />'
+    );
+    return postProcessTables(parse(processed));
   }
 
   /**
@@ -605,6 +609,21 @@
       pres[pi].style.overflow = 'auto';
       pres[pi].style.fontSize = '85%';
       pres[pi].style.fontFamily = 'ui-monospace,SFMono-Regular,SF Mono,Menlo,Consolas,Liberation Mono,monospace';
+    }
+
+    // Add spacing around headings
+    var headings = div.querySelectorAll('h1, h2, h3, h4, h5, h6');
+    for (var hi = 0; hi < headings.length; hi++) {
+      headings[hi].style.marginTop = '16px';
+      headings[hi].style.marginBottom = '8px';
+    }
+
+    // Style horizontal rules
+    var hrs = div.querySelectorAll('hr');
+    for (var hri = 0; hri < hrs.length; hri++) {
+      hrs[hri].style.margin = '16px 0';
+      hrs[hri].style.border = 'none';
+      hrs[hri].style.borderTop = '1px solid ' + colors.codeBorder;
     }
 
     return div;
