@@ -11,6 +11,10 @@ A bookmarklet that adds a **"Show Rendered Diff"** button to GitHub diff pages, 
 
 > **Why a bookmarklet?** GitHub's Content Security Policy blocks external scripts and fetches to third-party CDNs. A bookmarklet runs as a `javascript:` URL in the page context, bypassing CSP restrictions. The markdown parser ([snarkdown](https://github.com/developit/snarkdown)) is bundled inline so no external requests are needed.
 
+**_Best used with the browsers Bookmark Bar/toolbar, if you don't mind losing the vertical space, usually found under the bookmarks menu_**
+<img width="907" height="329" alt="image" src="https://github.com/user-attachments/assets/d0568f6a-58a2-4fbb-b105-58388f045425" />
+
+
 ## Features
 
 - **Rendered markdown diff** — headings, bold, italic, links, images, lists, blockquotes, code blocks, inline code, horizontal rules
