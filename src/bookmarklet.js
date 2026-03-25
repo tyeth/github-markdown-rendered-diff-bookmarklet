@@ -355,7 +355,12 @@
       if (/<pre[\s>]/i.test(line)) inPre = true;
       if (inPre) {
         if (tableRows.length > 0) flushTable();
-        out.push(line);
+        // Preserve newlines inside pre blocks — they were split by our \n split
+        if (out.length > 0 && !/<pre[\s>]/i.test(line)) {
+          out[out.length - 1] += '\n' + line;
+        } else {
+          out.push(line);
+        }
         if (/<\/pre>/i.test(line)) inPre = false;
         return;
       }
