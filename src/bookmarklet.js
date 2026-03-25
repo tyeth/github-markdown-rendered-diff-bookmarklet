@@ -753,7 +753,10 @@
       container.dataset.mdDiffAugmented = 'true';
 
       // Build the rendered view (hidden initially)
-      var isSplit = table.classList.contains('file-diff-split');
+      // Detect split view: classic UI uses file-diff-split class,
+      // React UI uses 4-column layout with left/right-side-diff-cell classes
+      var isSplit = table.classList.contains('file-diff-split') ||
+                    !!table.querySelector('.left-side-diff-cell, .right-side-diff-cell');
       var renderedDiff = createRenderedDiffView(lines, isSplit);
       renderedDiff.style.display = 'none';
 

@@ -18,10 +18,11 @@ const fs = require('fs');
 // Helpers
 // ---------------------------------------------------------------------------
 
-const BOOKMARKLET_PATH     = path.resolve(__dirname, '../src/bookmarklet.js');
-const PR_REACT_FIXTURE     = path.resolve(__dirname, 'fixtures/pr-changes-react.html');
-const TREE_CLASSIC_FIXTURE = path.resolve(__dirname, 'fixtures/tree-compare-classic.html');
-const TREE_SPLIT_FIXTURE   = path.resolve(__dirname, 'fixtures/tree-compare-split.html');
+const BOOKMARKLET_PATH        = path.resolve(__dirname, '../src/bookmarklet.js');
+const PR_REACT_FIXTURE        = path.resolve(__dirname, 'fixtures/pr-changes-react.html');
+const PR_REACT_SPLIT_FIXTURE  = path.resolve(__dirname, 'fixtures/pr-changes-react-split.html');
+const TREE_CLASSIC_FIXTURE    = path.resolve(__dirname, 'fixtures/tree-compare-classic.html');
+const TREE_SPLIT_FIXTURE      = path.resolve(__dirname, 'fixtures/tree-compare-split.html');
 
 const bookmarkletSource = fs.readFileSync(BOOKMARKLET_PATH, 'utf-8');
 
@@ -375,5 +376,62 @@ test.describe('Tree compare page (split view)', () => {
     const countAfter = await page.locator('.bookmarklet-toggle-btn').count();
 
     expect(countAfter).toBe(countBefore);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Tests: PR changes page — React UI split view (?diff=split)
+// ---------------------------------------------------------------------------
+
+test.describe('PR changes page (React UI, split view)', () => {
+  test.beforeEach(async ({ page }) => {
+    await loadFixture(page, PR_REACT_SPLIT_FIXTURE);
+  });
+
+  test('adds exactly one toggle button for the .md file diff', async ({ page }) => {
+    await runBookmarklet(page);
+    await expect(page.locator('.bookmarklet-toggle-btn')).toHaveCount(1);
+  });
+
+  test('rendered diff uses a split table layout, not unified', async ({ page }) => {
+    await runBookmarklet(page);
+    await page.locator('.bookmarklet-toggle-btn').click();
+
+    const rendered = page.locator('.bookmarklet-rendered-diff').first();
+    const splitTable = rendered.locator('.bookmarklet-split-table');
+    await expect(splitTable).toHaveCount(1);
+
+    const leftCells = rendered.locator('td.bookmarklet-split-left');
+    const rightCells = rendered.locator('td.bookmarklet-split-right');
+    await expect(leftCells).not.toHaveCount(0);
+    await expect(rightCells).not.toHaveCount(0);
+  });
+
+  test('clicking toggle shows rendered diff and hides code table', async ({ page }) => {
+    await runBookmarklet(page);
+    const btn = page.locator('.bookmarklet-toggle-btn');
+    await btn.click();
+
+    await expect(page.locator('.bookmarklet-rendered-diff')).toBeVisible();
+    await expect(btn).toHaveText('Show Code Diff');
+  });
+
+  test('both deleted and added content appear on correct sides', async ({ page }) => {
+    await runBookmarklet(page);
+    await page.locator('.bookmarklet-toggle-btn').click();
+
+    const del = page.locator('td.bookmarklet-split-left .bookmarklet-diff-chunk--delete');
+    const add = page.locator('td.bookmarklet-split-right .bookmarklet-diff-chunk--add');
+    await expect(del).not.toHaveCount(0);
+    await expect(add).not.toHaveCount(0);
+  });
+
+  test('rendered diff contains content (headings)', async ({ page }) => {
+    await runBookmarklet(page);
+    await page.locator('.bookmarklet-toggle-btn').click();
+
+    const rendered = page.locator('.bookmarklet-rendered-diff');
+    await expect(rendered).toContainText('How Does It Work?');
+    await expect(rendered).toContainText('Wippersnapper Component Definitions');
   });
 });
